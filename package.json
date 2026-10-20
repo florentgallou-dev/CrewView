@@ -1,0 +1,83 @@
+{
+  "name": "crew-view",
+  "displayName": "Crew View",
+  "description": "Open-space isométrique animé en temps réel représentant les agents Claude Code d'un projet.",
+  "version": "0.1.0",
+  "publisher": "digiworks",
+  "license": "UNLICENSED",
+  "private": true,
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Visualization",
+    "Other"
+  ],
+  "extensionKind": [
+    "workspace"
+  ],
+  "main": "./dist/extension.js",
+  "bin": {
+    "crew-view": "./dist/cli.js"
+  },
+  "activationEvents": [
+    "workspaceContains:AGENTS.md",
+    "workspaceContains:.crew-view/config.json",
+    "workspaceContains:.claude/agents/*.md",
+    "workspaceContains:.github/agents/*.md"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "crewView.open",
+        "title": "Ouvrir l'open-space",
+        "category": "Crew View",
+        "icon": "$(organization)"
+      },
+      {
+        "command": "crewView.openInBrowser",
+        "title": "Ouvrir l'open-space dans le navigateur",
+        "category": "Crew View"
+      },
+      {
+        "command": "crewView.generateClaudeAgents",
+        "title": "Générer les agents Claude Code depuis les agents Copilot",
+        "category": "Crew View"
+      },
+      {
+        "command": "crewView.initConfig",
+        "title": "Initialiser la configuration du projet",
+        "category": "Crew View"
+      }
+    ],
+    "configuration": {
+      "title": "Crew View",
+      "properties": {
+        "crewView.port": {
+          "type": "number",
+          "default": 4719,
+          "description": "Port local du serveur utilisé par « Ouvrir dans le navigateur »."
+        },
+        "crewView.claudeConfigDir": {
+          "type": "string",
+          "default": "",
+          "description": "Dossier de configuration de Claude Code. Vide = $CLAUDE_CONFIG_DIR ou ~/.claude."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node esbuild.mjs",
+    "watch": "node esbuild.mjs --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "node scripts/run-tests.mjs",
+    "package": "npm run build && vsce package --no-dependencies --allow-missing-repository --skip-license"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.0",
+    "@types/vscode": "~1.90.0",
+    "@vscode/vsce": "^3.2.0",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.9.0"
+  }
+}
