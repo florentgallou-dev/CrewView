@@ -2,21 +2,11 @@
 
 import type { AgentStatus, SceneAgent } from '../types';
 import { box, ellipse, iso, onWall, poly, shade, shaded, TZ, WALL_UNIT, withAlpha } from './iso';
+import { STATUS_COLORS } from './status';
 
 export const ROOM = { width: 14, depth: 11, height: 3 };
 export const DOOR = { y: 9.4, width: 1.2 };
 
-export const STATUS_COLORS: Record<AgentStatus, string> = {
-  idle: '#9aa0a6',
-  thinking: '#8b6cf0',
-  reading: '#3d8ee0',
-  writing: '#19a979',
-  running: '#e8a33b',
-  delegating: '#e8743b',
-  asking: '#d64550',
-  talking: '#13a4b4',
-  done: '#19a979',
-};
 
 const DESK_HEIGHT = 0.75;
 const INK = '#16181b';

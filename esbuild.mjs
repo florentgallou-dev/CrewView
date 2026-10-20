@@ -16,7 +16,7 @@ const builds = [
     sourcemap: true,
   },
   {
-    entryPoints: { webview: 'src/webview/main.ts' },
+    entryPoints: { webview: 'src/webview/main.ts', sidebar: 'src/webview/sidebar.ts' },
     outdir: 'dist/media',
     bundle: true,
     platform: 'browser',
@@ -28,6 +28,7 @@ const builds = [
 
 mkdirSync('dist/media', { recursive: true });
 copyFileSync('src/webview/style.css', 'dist/media/webview.css');
+copyFileSync('src/webview/sidebar.css', 'dist/media/sidebar.css');
 
 if (watch) {
   for (const options of builds) await (await esbuild.context(options)).watch();

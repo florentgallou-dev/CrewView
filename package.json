@@ -2,7 +2,7 @@
   "name": "crew-view",
   "displayName": "Crew View",
   "description": "Open-space isométrique animé en temps réel représentant les agents Claude Code d'un projet.",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "publisher": "digiworks",
   "license": "UNLICENSED",
   "private": true,
@@ -37,7 +37,8 @@
       {
         "command": "crewView.openInBrowser",
         "title": "Ouvrir l'open-space dans le navigateur",
-        "category": "Crew View"
+        "category": "Crew View",
+        "icon": "$(globe)"
       },
       {
         "command": "crewView.generateClaudeAgents",
@@ -46,10 +47,64 @@
       },
       {
         "command": "crewView.initConfig",
-        "title": "Initialiser la configuration du projet",
-        "category": "Crew View"
+        "title": "Ouvrir la configuration du projet",
+        "category": "Crew View",
+        "icon": "$(json)"
       }
     ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "crew",
+          "title": "Crew",
+          "icon": "resources/crew.svg"
+        }
+      ]
+    },
+    "views": {
+      "crew": [
+        {
+          "type": "webview",
+          "id": "crewView.agents",
+          "name": "Agents"
+        },
+        {
+          "type": "webview",
+          "id": "crewView.agent",
+          "name": "Agent sélectionné"
+        },
+        {
+          "type": "webview",
+          "id": "crewView.requests",
+          "name": "Demandes"
+        },
+        {
+          "type": "webview",
+          "id": "crewView.settings",
+          "name": "Paramètres",
+          "visibility": "collapsed"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "crewView.open",
+          "when": "view == crewView.agents",
+          "group": "navigation@1"
+        },
+        {
+          "command": "crewView.openInBrowser",
+          "when": "view == crewView.agents",
+          "group": "navigation@2"
+        },
+        {
+          "command": "crewView.initConfig",
+          "when": "view == crewView.settings",
+          "group": "navigation"
+        }
+      ]
+    },
     "configuration": {
       "title": "Crew View",
       "properties": {

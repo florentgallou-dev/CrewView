@@ -42,6 +42,30 @@ export function renderPage(options: PageOptions): string {
 </html>`;
 }
 
+export type SidebarView = 'agents' | 'agent' | 'requests' | 'settings';
+
+/** Vue de la barre latérale de VS Code (thème de l'éditeur). */
+export function renderSidebarPage(view: SidebarView, options: Omit<PageOptions, 'transport'>): string {
+  const csp = [
+    "default-src 'none'",
+    `style-src ${options.cspSource} 'unsafe-inline'`,
+    `script-src 'nonce-${options.nonce}'`,
+  ].join('; ');
+  return `<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="${csp}">
+  <link rel="stylesheet" href="${options.styleUri}">
+</head>
+<body data-view="${view}">
+  <main id="root"></main>
+  <script nonce="${options.nonce}" src="${options.scriptUri}"></script>
+</body>
+</html>`;
+}
+
 export function createNonce(): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   let nonce = '';

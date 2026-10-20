@@ -2,7 +2,7 @@
 
 import type { AgentDefinition } from './discovery';
 import { normalizeId } from './discovery';
-import type { CrewConfig } from './config';
+import type { AgentLookConfig, CrewConfig } from './config';
 import type { Accessory, Desk } from './types';
 
 export const ROOM = { width: 14, depth: 11 };
@@ -14,11 +14,17 @@ export const MAIN_ID = 'main';
 const BOSS_DESK: Desk = { x: 5.6, y: 1.0, w: 2.4, d: 1.0, kind: 'boss' };
 const DESK_W = 1.6;
 const DESK_D = 0.8;
+export interface DeskSlot {
+  label: string;
+  x: number;
+  y: number;
+}
+
 // 10 postes : deux rangées de quatre, puis deux bureaux devant à gauche (la droite est l'espace intérim).
-const DESK_SLOTS: [number, number][] = [
-  ...[3.8, 6.6].flatMap((y) => [1.4, 4.6, 7.8, 11.0].map((x): [number, number] => [x, y])),
-  [1.4, 9.4],
-  [4.6, 9.4],
+export const DESK_SLOTS: DeskSlot[] = [
+  ...[3.8, 6.6].flatMap((y, row) => [1.4, 4.6, 7.8, 11.0].map((x, i) => ({ label: `Rangée ${row + 1} – poste ${i + 1}`, x, y }))),
+  { label: 'Avant – poste 1', x: 1.4, y: 9.4 },
+  { label: 'Avant – poste 2', x: 4.6, y: 9.4 },
 ];
 const SHARED_TABLE = { x: 8.6, y: 9.4, d: 0.8, seat: 1.2, seats: 4 };
 
@@ -56,8 +62,7 @@ export function guessAccessory(text: string): Accessory {
  * de bureaux, et laisse la table partagée aux intérimaires (placés à la volée).
  */
 export function placeAgents(definitions: AgentDefinition[], config: CrewConfig): PlacedAgent[] {
-  const looks = config.agents ?? {};
-  const lookOf = (id: string) => looks[id] ?? Object.entries(looks).find(([key]) => normalizeId(key) === id)?.[1] ?? {};
+  const lookOf = (id: string) => lookFor(config, id);
   const visible = definitions.filter((d) => !lookOf(d.id).hidden);
 
   const orchestratorId = config.orchestrator ? normalizeId(config.orchestrator) : visible.find((d) => d.isOrchestrator)?.id;
@@ -81,7 +86,7 @@ export function placeAgents(definitions: AgentDefinition[], config: CrewConfig):
 
   specialists.forEach((definition, index) => {
     const look = lookOf(definition.id);
-    const [column, row] = DESK_SLOTS[index % DESK_SLOTS.length];
+    const { x: column, y: row } = DESK_SLOTS[index % DESK_SLOTS.length];
     placed.push({
       id: definition.id,
       name: look.label ?? definition.name,
@@ -120,6 +125,19 @@ export function placeTemp(id: string, name: string, slot: number): PlacedAgent {
     isMain: false,
     temp: true,
   };
+}
+
+/** Apparence configurée d'un agent : clé exacte, ou clé dont la forme normalisée correspond. */
+export function lookFor(config: CrewConfig, id: string): AgentLookConfig {
+  const looks = config.agents ?? {};
+  return looks[id] ?? Object.entries(looks).find(([key]) => normalizeId(key) === id)?.[1] ?? {};
+}
+
+/** Applique la configuration (nom, couleur) à un intérimaire ; undefined s'il est masqué. */
+export function applyTempLook(temp: PlacedAgent, config: CrewConfig): PlacedAgent | undefined {
+  const look = lookFor(config, temp.id);
+  if (look.hidden) return undefined;
+  return { ...temp, name: look.label || temp.name, color: look.color || temp.color };
 }
 
 function withPosition(desk: Desk, position?: [number, number]): Desk {

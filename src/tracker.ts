@@ -4,7 +4,8 @@
 
 import { normalizeId } from './discovery';
 import { placeTemp, type PlacedAgent } from './layout';
-import type { AgentRuntime, AgentStatus, BubbleKind, Dialog } from './types';
+import type { AgentRuntime, AgentStatus, BubbleKind, Dialog, RequestSummary, SessionCost, TokenUsage } from './types';
+import { addUsage, emptyUsage, usageOfMessage } from './usage';
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- les transcripts sont du JSON non typé */
 type TranscriptRecord = any;
@@ -29,6 +30,14 @@ export interface SubagentMeta {
 interface Task {
   agentId: string;
   active: boolean;
+  /** Demande pendant laquelle la tâche a été confiée : sa consommation lui est imputée. */
+  requestId: string;
+}
+
+interface CountedMessage {
+  agentId: string;
+  requestId: string;
+  usage: TokenUsage;
 }
 
 const AGENT_TOOLS = new Set(['Agent', 'Task']);
@@ -43,13 +52,17 @@ export class SessionTracker {
   readonly temps: PlacedAgent[] = [];
   title?: string;
   dialog?: Dialog;
+  /** Demandes de la session, dans l'ordre chronologique. */
+  readonly requests: RequestSummary[] = [];
+  sessionCost?: SessionCost;
   /** Pendant la relecture initiale : pas d'animation de délégation. */
   replaying = false;
 
   private readonly tasks = new Map<string, Task>();
   private readonly subagentFiles = new Map<string, string>();
   private readonly toolNames = new Map<string, string>();
-  private readonly usage = new Map<string, Map<string, { input: number; output: number }>>();
+  /** Une réponse du modèle est découpée en plusieurs enregistrements portant le même id : on garde le dernier relevé. */
+  private readonly counted = new Map<string, CountedMessage>();
 
   constructor(
     private readonly directory: AgentDirectory,
@@ -64,19 +77,22 @@ export class SessionTracker {
     if (record.type === 'ai-title' && typeof record.aiTitle === 'string') {
       this.title = record.aiTitle;
       this.events.onChange();
+    } else if (record.type === 'cost-state') {
+      this.sessionCost = sessionCostOf(record);
+      this.events.onChange();
     } else if (record.type === 'user') {
       this.handleMainUser(record, at);
     } else if (record.type === 'assistant') {
-      if (this.handleAssistant(this.main, record, at)) this.apply(this.main, at, 'done');
+      if (this.handleAssistant(this.main, record, at, this.currentRequest(at).id)) this.apply(this.main, at, 'done');
     }
   }
 
-  registerSubagent(fileAgentId: string, meta: SubagentMeta): void {
+  registerSubagent(fileAgentId: string, meta: SubagentMeta, at = Date.now()): void {
     const toolUseId = meta.toolUseId ?? `file:${fileAgentId}`;
     this.subagentFiles.set(fileAgentId, toolUseId);
     if (!this.tasks.has(toolUseId)) {
       const agentId = this.resolveAgentType(meta.agentType ?? 'general-purpose');
-      this.startTask(toolUseId, agentId, meta.description, Date.now());
+      this.startTask(toolUseId, agentId, meta.description, at);
     }
   }
 
@@ -86,7 +102,7 @@ export class SessionTracker {
     if (!task || !record) return;
     const at = timeOf(record);
     if (record.type === 'assistant') {
-      if (this.handleAssistant(task.agentId, record, at)) this.finishTask(toolUseId!, at);
+      if (this.handleAssistant(task.agentId, record, at, task.requestId)) this.finishTask(toolUseId!, at);
     } else if (record.type === 'user' && hasToolResult(record.message?.content)) {
       this.setStatus(task.agentId, at, 'thinking');
     }
@@ -122,7 +138,7 @@ export class SessionTracker {
   runtimeOf(id: string): AgentRuntime {
     let runtime = this.runtimes.get(id);
     if (!runtime) {
-      runtime = { status: 'idle', statusAt: 0, files: [], history: [], tokensIn: 0, tokensOut: 0, activeTasks: 0 };
+      runtime = { status: 'idle', statusAt: 0, files: [], history: [], usage: emptyUsage(), activeTasks: 0 };
       this.runtimes.set(id, runtime);
     }
     return runtime;
@@ -155,6 +171,7 @@ export class SessionTracker {
     }
     const prompt = stripContextTags(text);
     if (!prompt) return;
+    this.requests.push({ id: record.promptId ?? record.uuid ?? `demande-${this.requests.length + 1}`, at, prompt: clip(prompt, 140), total: emptyUsage(), byAgent: {} });
     this.dialog = { speaker: 'Vous', text: clip(prompt, 400), at };
     this.apply(this.main, at, 'thinking', 'Lit votre demande…', 'think');
   }
@@ -170,10 +187,10 @@ export class SessionTracker {
   // ---- Messages de l'assistant (principal ou subagent) -------------------------------------
 
   /** Retourne vrai si le message clôt le tour de l'agent. */
-  private handleAssistant(agentId: string, record: TranscriptRecord, at: number): boolean {
+  private handleAssistant(agentId: string, record: TranscriptRecord, at: number, requestId: string): boolean {
     const message = record.message;
     if (!message) return false;
-    this.countUsage(agentId, message);
+    this.countUsage(agentId, requestId, message);
     const content: TranscriptRecord[] = Array.isArray(message.content) ? message.content : [];
 
     for (const block of content) {
@@ -232,7 +249,7 @@ export class SessionTracker {
 
   private startTask(toolUseId: string, agentId: string, label: string | undefined, at: number): void {
     if (this.tasks.has(toolUseId)) return;
-    this.tasks.set(toolUseId, { agentId, active: true });
+    this.tasks.set(toolUseId, { agentId, active: true, requestId: this.currentRequest(at).id });
     const runtime = this.runtimeOf(agentId);
     runtime.activeTasks++;
     runtime.task = label;
@@ -281,24 +298,47 @@ export class SessionTracker {
     this.events.onChange();
   }
 
-  /** Les blocs d'un même message partagent son id : on garde le dernier relevé d'usage. */
-  private countUsage(agentId: string, message: TranscriptRecord): void {
-    const usage = message.usage;
-    if (!usage || !message.id) return;
-    let perMessage = this.usage.get(agentId);
-    if (!perMessage) this.usage.set(agentId, (perMessage = new Map()));
-    perMessage.set(message.id, {
-      input: (usage.input_tokens ?? 0) + (usage.cache_creation_input_tokens ?? 0) + (usage.cache_read_input_tokens ?? 0),
-      output: usage.output_tokens ?? 0,
-    });
-    const runtime = this.runtimeOf(agentId);
-    runtime.tokensIn = 0;
-    runtime.tokensOut = 0;
-    for (const { input, output } of perMessage.values()) {
-      runtime.tokensIn += input;
-      runtime.tokensOut += output;
-    }
+  // ---- Consommation ---------------------------------------------------------------------
+
+  /** Demande en cours ; avant tout prompt (session reprise), une demande « début de session » la remplace. */
+  private currentRequest(at: number): RequestSummary {
+    if (!this.requests.length) this.requests.push({ id: 'debut', at, prompt: '(début de session)', total: emptyUsage(), byAgent: {} });
+    return this.requests[this.requests.length - 1];
   }
+
+  /** Impute la consommation d'une réponse à l'agent, à la demande et au bilan par agent de la demande. */
+  private countUsage(agentId: string, requestId: string, message: TranscriptRecord): void {
+    const usage = usageOfMessage(message);
+    if (!usage || !message.id) return;
+    const previous = this.counted.get(message.id);
+    if (previous) this.account(previous, -1);
+    const counted = { agentId, requestId, usage };
+    this.counted.set(message.id, counted);
+    this.account(counted, 1);
+  }
+
+  private account({ agentId, requestId, usage }: CountedMessage, sign: 1 | -1): void {
+    addUsage(this.runtimeOf(agentId).usage, usage, sign);
+    const request = this.requests.find((r) => r.id === requestId);
+    if (!request) return;
+    addUsage(request.total, usage, sign);
+    addUsage((request.byAgent[agentId] ??= emptyUsage()), usage, sign);
+  }
+}
+
+/** Coût réel cumulé de la session, tel que Claude Code l'enregistre. */
+function sessionCostOf(record: TranscriptRecord): SessionCost {
+  const n = (value: unknown) => (typeof value === 'number' && Number.isFinite(value) ? value : 0);
+  const byModel = Object.entries((record.modelUsage ?? {}) as Record<string, TranscriptRecord>).map(([model, u]) => ({
+    model,
+    costUsd: n(u?.costUSD),
+    inputTokens: n(u?.inputTokens),
+    outputTokens: n(u?.outputTokens),
+    cacheReadTokens: n(u?.cacheReadInputTokens),
+    cacheWriteTokens: n(u?.cacheCreationInputTokens),
+    webSearches: n(u?.webSearchRequests),
+  }));
+  return { totalUsd: n(record.totalCostUSD), byModel };
 }
 
 // ---- Description des outils ------------------------------------------------------------
@@ -360,7 +400,7 @@ export function describeTool(name: string, input: Record<string, any>): ToolActi
 
 // ---- Utilitaires -------------------------------------------------------------------------
 
-function timeOf(record: TranscriptRecord): number {
+export function timeOf(record: TranscriptRecord): number {
   const parsed = typeof record.timestamp === 'string' ? Date.parse(record.timestamp) : NaN;
   return Number.isFinite(parsed) ? parsed : Date.now();
 }

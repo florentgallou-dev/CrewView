@@ -30,7 +30,29 @@ Commandes (palette `Ctrl+Shift+P`, préfixe **Crew View**) :
 | Ouvrir l'open-space | Panneau à côté de l'éditeur. Raccourci : `Crew` dans la barre d'état. |
 | Ouvrir l'open-space dans le navigateur | Serveur local sur `127.0.0.1:4719` (réglage `crewView.port`) |
 | Générer les agents Claude Code depuis les agents Copilot | Voir plus bas |
-| Initialiser la configuration du projet | Crée `.crew-view/config.json` |
+| Ouvrir la configuration du projet | Ouvre `.crew-view/config.json`, après l'avoir créé s'il n'existe pas |
+
+### Barre latérale Crew
+
+L'icône **Crew** de la barre d'activité (colonne de gauche) ouvre trois vues :
+
+- **Agents** : la liste des agents et leur statut en direct, avec l'activité en cours (fichier lu ou modifié, commande…). Elle reste utile quand l'open-space est caché derrière un éditeur. Un clic sélectionne l'agent ; un second clic le désélectionne.
+- **Agent sélectionné** : la fiche de l'agent, en sections repliables :
+  - **Rôle** ;
+  - **Tâche** (en cours ou dernière, avec les fichiers touchés) ;
+  - **Activité** : consommation de l'agent sur la session, puis par demande ;
+  - **Historique**.
+
+  L'état replié est mémorisé d'un agent à l'autre et d'une session de VS Code à l'autre. Un clic sur un agent dans l'open-space l'ouvre ici, et la sélection est synchronisée dans les deux sens.
+- **Demandes** : la consommation de tokens de la session suivie. On y trouve le total de la session, le coût réel enregistré par Claude Code, puis une entrée par prompt avec son bilan et le détail par agent. Un subagent est compté dans la demande qui l'a lancé, même s'il termine après le prompt suivant.
+- **Paramètres** :
+  - pour le projet : orchestrateur et dossiers d'agents supplémentaires ;
+  - pour chaque agent, intérimaires compris : nom affiché, couleur, accessoire, poste et masquage. Choisir un poste déjà occupé échange les deux agents ;
+  - pour VS Code : port du navigateur et dossier Claude.
+
+  Les réglages du projet sont écrits dans `.crew-view/config.json` et appliqués à chaud.
+
+En mode navigateur, sans barre latérale, la fiche s'affiche dans un panneau flottant.
 
 ### Sans VS Code (CLI)
 
@@ -76,7 +98,7 @@ Les fichiers Copilot restent la source : modifiez-les puis régénérez.
 }
 ```
 
-- Les clés de `agents` sont les identifiants (nom normalisé : `Frontend & Builder` → `frontend-builder`) ou les noms tels quels.
+- Les clés de `agents` sont les identifiants (nom normalisé : `Frontend & Builder` → `frontend-builder`) ou les noms tels quels. Les intérimaires ont pour clé `interim-<type>` (par ex. `interim-explore`) ; on peut régler leur `label`, leur `color` et `hidden`.
 - Accessoires : `plant`, `lamp`, `mug`, `books`, `server`, `magnifier`, `trophy`, `shield`, `none`.
 - `desk` est le coin arrière-gauche du bureau, en tuiles, dans une salle de 14 × 11. Les emplacements par défaut sont deux rangées de quatre bureaux (y = 3.8 et 6.6 ; x = 1.4, 4.6, 7.8, 11), puis deux postes à l'avant gauche. L'avant droit est réservé à l'intérim.
 - Les modifications sont prises en compte à chaud (toutes les 3 s).
@@ -95,6 +117,30 @@ Les fichiers Copilot restent la source : modifiez-les puis régénérez.
 | Terminé | fin de tour / notification de fin de tâche | s'étire, puis repos après 6 s |
 
 Une seule session est suivie à la fois : la plus récemment active du projet. Si une nouvelle session démarre, ou si une autre devient active alors que la session suivie est silencieuse depuis 30 s, Crew View bascule sur elle.
+
+## Consommation de tokens
+
+Les compteurs sont lus tels quels dans le champ `usage` de chaque réponse du modèle. Une réponse découpée en plusieurs enregistrements n'est comptée qu'une fois.
+
+| Ligne | Champ du transcript |
+|---|---|
+| Appels au modèle, Modèle | nombre de réponses distinctes, `model` |
+| Entrée | `input_tokens` |
+| Cache écrit (dont 5 min / 1 h) | `cache_creation_input_tokens` (`cache_creation.ephemeral_5m/1h_input_tokens`) |
+| Cache lu | `cache_read_input_tokens` |
+| Tokens lus | entrée + cache écrit + cache lu |
+| Tokens produits (dont réflexion) | `output_tokens` (`output_tokens_details.thinking_tokens`) |
+| Recherches web, Pages web lues | `server_tool_use.web_search_requests` / `web_fetch_requests` |
+
+Le **coût estimé** est la seule valeur calculée. Il applique la grille publique de l'API Anthropic (`src/pricing.ts`, relevée le 2026-10-20) :
+- écriture du cache : 1,25 × le prix d'entrée (5 min) ou 2 × (1 h) ;
+- lecture du cache : taux propre à chaque modèle ;
+- Haiku 5.5 : deux grilles selon la taille du prompt ;
+- mode rapide : 2 × ;
+- inférence limitée aux États-Unis : 1,1 × ;
+- recherches web : 10 $ les 1 000.
+
+Un modèle sans tarif connu est exclu de l'estimation, et l'écran le signale. Le **coût réel** est celui que Claude Code enregistre lui-même pour la session (enregistrement `cost-state`). Il n'existe qu'au niveau de la session.
 
 ## Développement
 
@@ -117,7 +163,11 @@ Structure :
 
 ```
 src/
-  extension.ts   commandes VS Code, panneau webview
+  extension.ts   commandes VS Code, panneau webview, sélection partagée
+  sidebarViews.ts barre latérale (agents, agent sélectionné, paramètres)
+  settings.ts    données de l'écran de paramètres, écriture de config.json
+  pricing.ts     grille tarifaire publique (coût estimé)
+  usage.ts       relevé et cumul de la consommation de tokens
   cli.ts         lancement hors VS Code
   hub.ts         assemble définitions + configuration + session, diffuse l'état
   discovery.ts   recherche et lecture des définitions d'agents
@@ -133,6 +183,6 @@ src/
 
 ## Pistes (v1.1)
 
-- Écran de paramètres visuel (placement des bureaux par glisser-déposer, couleurs, accessoires).
+- Placement des bureaux par glisser-déposer dans la scène.
 - Statistiques de session (durées par agent, coût estimé).
 - Plusieurs sessions ou projets simultanés.

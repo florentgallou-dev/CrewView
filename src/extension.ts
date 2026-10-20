@@ -1,4 +1,4 @@
-// Extension VS Code : panneau de l'open-space, ouverture navigateur, outils de configuration.
+// Extension VS Code : open-space (panneau et navigateur), barre latérale Crew, outils de configuration.
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -10,14 +10,31 @@ import { createNonce, renderPage } from './html';
 import { CrewHub } from './hub';
 import { placeAgents } from './layout';
 import { startServer, type RunningServer } from './server';
+import { CrewSidebar } from './sidebarViews';
 import type { ClientMessage } from './types';
 
-const hubs = new Map<string, CrewHub>();
+/** Un hub par projet, partagé par le panneau, le navigateur et la barre latérale. */
+const hubs = new Map<string, { hub: CrewHub; users: number }>();
 const panels = new Map<string, vscode.WebviewPanel>();
 const servers = new Map<string, Promise<RunningServer>>();
+const selections = new Map<string, string | undefined>();
+let currentRoot: string | undefined;
+let sidebar: CrewSidebar | undefined;
 
 export function activate(context: vscode.ExtensionContext): void {
+  currentRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  sidebar = new CrewSidebar(context.extensionUri, {
+    currentRoot: () => currentRoot,
+    acquireHub,
+    releaseHub,
+    selected: (root) => selections.get(root),
+    select,
+    openSource,
+  }, context.globalState);
+
   context.subscriptions.push(
+    ...sidebar.register(),
+    sidebar,
     vscode.commands.registerCommand('crewView.open', async () => {
       const root = await pickRoot();
       if (root) openPanel(context, root);
@@ -34,6 +51,13 @@ export function activate(context: vscode.ExtensionContext): void {
       const root = await pickRoot();
       if (root) await initConfig(root);
     }),
+    vscode.workspace.onDidChangeWorkspaceFolders(() => {
+      const folders = vscode.workspace.workspaceFolders ?? [];
+      if (!folders.some((f) => f.uri.fsPath === currentRoot)) setCurrentRoot(folders[0]?.uri.fsPath);
+    }),
+    vscode.workspace.onDidChangeConfiguration((event) => {
+      if (event.affectsConfiguration('crewView')) sidebar?.refreshSettings();
+    }),
   );
 
   const item = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 50);
@@ -46,11 +70,14 @@ export function activate(context: vscode.ExtensionContext): void {
 
 export function deactivate(): void {
   for (const server of servers.values()) server.then((s) => s.close(), () => undefined);
-  for (const hub of hubs.values()) hub.dispose();
+  for (const { hub } of hubs.values()) hub.dispose();
   hubs.clear();
   servers.clear();
 }
 
+// ---- Projets et hubs --------------------------------------------------------------------------
+
+/** Projet courant si un seul dossier est ouvert, sinon choix (le projet courant en tête). */
 async function pickRoot(): Promise<string | undefined> {
   const folders = vscode.workspace.workspaceFolders ?? [];
   if (folders.length === 0) {
@@ -62,25 +89,49 @@ async function pickRoot(): Promise<string | undefined> {
   return picked?.uri.fsPath;
 }
 
-function hubFor(root: string): CrewHub {
-  let hub = hubs.get(root);
-  if (!hub) {
-    const claudeConfigDir = vscode.workspace.getConfiguration('crewView').get<string>('claudeConfigDir');
-    hub = new CrewHub({ root, claudeConfigDir });
-    hub.start();
-    hubs.set(root, hub);
-  }
-  return hub;
+function setCurrentRoot(root: string | undefined): void {
+  if (root === currentRoot) return;
+  currentRoot = root;
+  sidebar?.setRoot(root);
 }
 
-/** Libère le hub d'un projet quand plus aucune vue ne l'utilise. */
+function acquireHub(root: string): CrewHub {
+  let entry = hubs.get(root);
+  if (!entry) {
+    const claudeConfigDir = vscode.workspace.getConfiguration('crewView').get<string>('claudeConfigDir');
+    const hub = new CrewHub({ root, claudeConfigDir });
+    hub.start();
+    entry = { hub, users: 0 };
+    hubs.set(root, entry);
+  }
+  entry.users++;
+  return entry.hub;
+}
+
 function releaseHub(root: string): void {
-  if (panels.has(root) || servers.has(root)) return;
-  hubs.get(root)?.dispose();
+  const entry = hubs.get(root);
+  if (!entry || --entry.users > 0) return;
+  entry.hub.dispose();
   hubs.delete(root);
 }
 
+// ---- Sélection partagée -----------------------------------------------------------------------
+
+function select(root: string, agentId: string | undefined): void {
+  selections.set(root, agentId);
+  void panels.get(root)?.webview.postMessage({ type: 'selection', agentId });
+  sidebar?.onSelection(root, agentId);
+}
+
+function openSource(root: string, agentId: string): void {
+  const source = hubs.get(root)?.hub.sourceOf(agentId);
+  if (source) void vscode.window.showTextDocument(vscode.Uri.file(source), { viewColumn: vscode.ViewColumn.One });
+}
+
+// ---- Open-space -------------------------------------------------------------------------------
+
 function openPanel(context: vscode.ExtensionContext, root: string): void {
+  setCurrentRoot(root);
   const existing = panels.get(root);
   if (existing) {
     existing.reveal();
@@ -100,16 +151,23 @@ function openPanel(context: vscode.ExtensionContext, root: string): void {
     transport: 'vscode',
   });
 
-  const hub = hubFor(root);
+  const hub = acquireHub(root);
   let unsubscribe: (() => void) | undefined;
   panel.webview.onDidReceiveMessage((message: ClientMessage) => {
     if (message.type === 'ready') {
       unsubscribe?.();
       unsubscribe = hub.subscribe((m) => void panel.webview.postMessage(m));
+      void panel.webview.postMessage({ type: 'selection', agentId: selections.get(root) });
+    } else if (message.type === 'select') {
+      setCurrentRoot(root);
+      select(root, message.agentId);
+      if (message.agentId) sidebar?.revealDetail();
     } else if (message.type === 'openSource') {
-      const source = hub.sourceOf(message.agentId);
-      if (source) void vscode.window.showTextDocument(vscode.Uri.file(source), { viewColumn: vscode.ViewColumn.One });
+      openSource(root, message.agentId);
     }
+  });
+  panel.onDidChangeViewState(() => {
+    if (panel.active) setCurrentRoot(root);
   });
   panel.onDidDispose(() => {
     unsubscribe?.();
@@ -123,7 +181,7 @@ async function openInBrowser(context: vscode.ExtensionContext, root: string): Pr
   let server = servers.get(root);
   if (!server) {
     const port = vscode.workspace.getConfiguration('crewView').get<number>('port') ?? 4719;
-    server = startServer(hubFor(root), path.join(context.extensionPath, 'dist', 'media'), port);
+    server = startServer(acquireHub(root), path.join(context.extensionPath, 'dist', 'media'), port);
     servers.set(root, server);
   }
   try {
@@ -137,6 +195,8 @@ async function openInBrowser(context: vscode.ExtensionContext, root: string): Pr
     void vscode.window.showErrorMessage(`Crew View : impossible de démarrer le serveur local (${(error as Error).message}).`);
   }
 }
+
+// ---- Outils de configuration ------------------------------------------------------------------
 
 async function generateClaudeAgents(root: string): Promise<void> {
   const plan = planConversion(root);

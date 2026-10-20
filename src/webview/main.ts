@@ -1,26 +1,20 @@
 // Scène : réception de l'état, boucle d'animation et interface (bulles, dialogue, panneau).
+// Dans VS Code, la sélection est partagée avec la barre latérale (qui affiche la fiche de l'agent) ;
+// dans le navigateur, la fiche s'affiche dans un panneau flottant.
 
 import type { AgentStatus, ClientMessage, HostMessage, SceneAgent, SceneState } from '../types';
+import { renderAgentDetail } from './detail';
+import { el, fill } from './dom';
 import { drawFigure, FIGURE_HEIGHT, poseFor } from './figure';
 import { iso, type Point } from './iso';
-import { decorDrawables, deskDepth, DOOR, drawDesk, drawDeskFloor, drawNameplate, drawRoom, type Drawable, ROOM, STATUS_COLORS } from './room';
+import { decorDrawables, deskDepth, DOOR, drawDesk, drawDeskFloor, drawNameplate, drawRoom, type Drawable, ROOM } from './room';
+import { BUBBLE_TTL_MS, STATUS_COLORS, STATUS_LABELS } from './status';
 import { addStop, startArrival, startDelivery, stepWalker, visitorSpot, type Vec2, type Walker } from './walk';
 
 declare function acquireVsCodeApi(): { postMessage(message: ClientMessage): void };
 
-const STATUS_LABELS: Record<AgentStatus, string> = {
-  idle: 'Disponible',
-  thinking: 'Réfléchit',
-  reading: 'Lit',
-  writing: 'Écrit',
-  running: 'Exécute',
-  delegating: 'Délègue',
-  asking: 'Attend votre réponse',
-  talking: 'Parle',
-  done: 'Terminé',
-};
-const BUBBLE_TTL_MS = 10_000;
 const DIALOG_TTL_MS = 60_000;
+const IN_VSCODE = document.body.dataset.transport === 'vscode';
 
 // ---- Éléments de la page ----------------------------------------------------------------
 
@@ -53,7 +47,7 @@ let camera = { scale: 1, ox: 0, oy: 0 };
 const send = connect();
 
 function connect(): (message: ClientMessage) => void {
-  if (document.body.dataset.transport === 'vscode') {
+  if (IN_VSCODE) {
     const vscode = acquireVsCodeApi();
     window.addEventListener('message', (event) => onMessage(event.data as HostMessage));
     vscode.postMessage({ type: 'ready' });
@@ -91,6 +85,9 @@ function onMessage(message: HostMessage): void {
     if (selectedId) renderPanel();
   } else if (message.type === 'delegate') {
     deliver(message.from, message.to);
+  } else if (message.type === 'selection') {
+    selectedId = message.agentId;
+    renderDialog();
   }
 }
 
@@ -184,8 +181,9 @@ function resize(): void {
   const maxX = iso(ROOM.width, 0).x + 10;
   const minY = iso(0, 0, ROOM.height).y - 10;
   const maxY = iso(ROOM.width, ROOM.depth).y + 24;
+  // Marges fixes : la barre de dialogue flotte au-dessus de la scène sans la recadrer.
   const top = 52;
-  const bottom = dialogEl.hidden ? 24 : 96;
+  const bottom = 24;
   const scale = Math.min((width - 24) / (maxX - minX), (height - top - bottom) / (maxY - minY), 2.4);
   camera = {
     scale,
@@ -295,66 +293,32 @@ function renderDialog(): void {
   dialogTextEl.textContent = text ?? '';
 }
 
+/** Panneau flottant (navigateur uniquement ; dans VS Code la fiche est dans la barre latérale). */
 function renderPanel(): void {
-  const agent = selectedId ? agentById(selectedId) : undefined;
+  const agent = !IN_VSCODE && selectedId ? agentById(selectedId) : undefined;
   panelEl.hidden = !agent;
   if (!agent) return;
-  const r = agent.runtime;
-  const time = (at: number) => new Date(at).toLocaleTimeString('fr-FR');
-  const tokens = (n: number) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)} M` : n >= 1e3 ? `${(n / 1e3).toFixed(1)} k` : String(n));
-  panelEl.replaceChildren(
+  fill(panelEl, [
     el('button', { className: 'close', title: 'Fermer', onclick: () => select(undefined) }, '×'),
-    el('div', { className: 'panel-head' },
-      el('span', { className: 'swatch', style: `background:${agent.color}` }),
-      el('div', {},
-        el('h2', {}, agent.name),
-        el('div', { className: 'muted' }, agent.isMain ? 'Session principale' : agent.temp ? 'Intérimaire (agent intégré)' : 'Agent du projet'),
-      ),
-    ),
-    el('div', { className: 'status-line' },
-      el('span', { className: 'status-dot', style: `background:${STATUS_COLORS[r.status]}` }),
-      `${STATUS_LABELS[r.status]}${r.activeTasks > 1 ? ` · ${r.activeTasks} tâches` : ''}`,
-    ),
-    agent.description ? el('p', { className: 'description' }, agent.description) : '',
-    r.task ? section(r.activeTasks > 0 ? 'Tâche en cours' : 'Dernière tâche', el('p', {}, r.task)) : '',
-    section('Activité',
-      el('dl', { className: 'stats' },
-        el('dt', {}, 'Dernier outil'), el('dd', {}, r.tool ?? '—'),
-        el('dt', {}, 'Tokens produits'), el('dd', {}, tokens(r.tokensOut)),
-        el('dt', {}, 'Tokens lus'), el('dd', {}, tokens(r.tokensIn)),
-      ),
-    ),
-    r.files.length ? section('Fichiers touchés', el('ul', { className: 'files' }, ...r.files.map((f) => el('li', { title: f }, f.split(/[\\/]/).pop() ?? f)))) : '',
-    section('Historique',
-      r.history.length
-        ? el('ol', { className: 'history' }, ...[...r.history].reverse().map((h) =>
-            el('li', {}, el('time', {}, time(h.at)), el('span', { className: 'status-dot', style: `background:${STATUS_COLORS[h.status]}` }), h.text)))
-        : el('p', { className: 'muted' }, 'Aucune activité dans cette session.'),
-    ),
-    agent.source && document.body.dataset.transport === 'vscode'
-      ? el('button', { className: 'link', onclick: () => send({ type: 'openSource', agentId: agent.id }) }, `Ouvrir ${agent.source}`)
-      : agent.source ? el('p', { className: 'muted source' }, agent.source) : '',
-  );
+    ...renderAgentDetail(agent, {
+      requests: state?.requests,
+      isOpen: (key, byDefault) => panelFolds[key] ?? byDefault,
+      onToggle: (key, open) => {
+        panelFolds[key] = open;
+      },
+    }),
+  ]);
 }
 
-function section(title: string, ...children: (Node | string)[]): HTMLElement {
-  return el('section', {}, el('h3', {}, title), ...children);
-}
-
-function el<K extends keyof HTMLElementTagNameMap>(
-  tag: K,
-  props: Partial<Omit<HTMLElementTagNameMap[K], 'style'>> & { style?: string },
-  ...children: (Node | string)[]
-): HTMLElementTagNameMap[K] {
-  const node = document.createElement(tag);
-  const { style, ...rest } = props;
-  Object.assign(node, rest);
-  if (style) node.setAttribute('style', style);
-  node.append(...children.filter((c) => c !== ''));
-  return node;
-}
+/** Sections repliées du panneau (navigateur : mémorisées le temps de la page). */
+const panelFolds: Record<string, boolean> = {};
 
 function select(id: string | undefined): void {
+  if (IN_VSCODE) {
+    // L'extension renvoie la sélection à toutes les vues, y compris celle-ci.
+    send({ type: 'select', agentId: id });
+    return;
+  }
   selectedId = id;
   renderPanel();
   renderDialog();

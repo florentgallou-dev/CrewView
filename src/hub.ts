@@ -2,12 +2,13 @@
 
 import * as path from 'node:path';
 import { claudeHome, projectTranscriptDir } from './claudePaths';
-import { loadConfig } from './config';
-import { discoverAgents } from './discovery';
-import { placeAgents, type PlacedAgent } from './layout';
+import { loadConfig, type CrewConfig } from './config';
+import { discoverAgents, type AgentDefinition } from './discovery';
+import { applyTempLook, placeAgents, type PlacedAgent } from './layout';
 import { SessionWatcher } from './session';
 import { SessionTracker } from './tracker';
 import type { AgentRuntime, HostMessage, SceneState } from './types';
+import { emptyUsage } from './usage';
 
 export interface HubOptions {
   root: string;
@@ -24,7 +25,9 @@ export class CrewHub {
   readonly transcriptDir: string;
   private placed: PlacedAgent[] = [];
   private placedSignature = '';
-  private configError?: string;
+  private currentDefinitions: AgentDefinition[] = [];
+  private currentConfig: CrewConfig = {};
+  private currentConfigError?: string;
   private tracker?: SessionTracker;
   private sessionId?: string;
   private watcher?: SessionWatcher;
@@ -71,9 +74,28 @@ export class CrewHub {
     return source ? path.join(this.root, source) : undefined;
   }
 
+  /** Configuration et définitions courantes (écran de paramètres). */
+  get definitions(): AgentDefinition[] {
+    return this.currentDefinitions;
+  }
+
+  get config(): CrewConfig {
+    return this.currentConfig;
+  }
+
+  get configError(): string | undefined {
+    return this.currentConfigError;
+  }
+
+  /** Relit définitions et configuration immédiatement (après une modification par l'extension). */
+  reload(): void {
+    this.reloadDefinitions();
+  }
+
   snapshot(): SceneState {
     const tracker = this.tracker;
-    const agents = [...this.placed, ...(tracker?.temps ?? [])].map((agent) => ({
+    const temps = (tracker?.temps ?? []).flatMap((temp) => applyTempLook(temp, this.currentConfig) ?? []);
+    const agents = [...this.placed, ...temps].map((agent) => ({
       ...agent,
       runtime: tracker?.runtimes.get(agent.id) ?? emptyRuntime(),
     }));
@@ -82,9 +104,11 @@ export class CrewHub {
       sessionId: this.sessionId,
       sessionTitle: tracker?.title,
       watching: Boolean(tracker),
-      notice: this.configError ?? (tracker ? undefined : 'En attente d’une session Claude Code dans ce projet…'),
+      notice: this.currentConfigError ?? (tracker ? undefined : 'En attente d’une session Claude Code dans ce projet…'),
       agents,
       dialog: tracker?.dialog,
+      requests: tracker?.requests ?? [],
+      sessionCost: tracker?.sessionCost,
     };
   }
 
@@ -110,12 +134,15 @@ export class CrewHub {
 
   private reloadDefinitions(): void {
     const { config, error } = loadConfig(this.root);
-    const placed = placeAgents(discoverAgents(this.root, config.agentsDirs), config);
-    const signature = JSON.stringify([placed, error]);
+    const definitions = discoverAgents(this.root, config.agentsDirs);
+    const placed = placeAgents(definitions, config);
+    const signature = JSON.stringify([placed, error, config, definitions.map((d) => [d.id, d.name])]);
     if (signature === this.placedSignature) return;
     this.placedSignature = signature;
     this.placed = placed;
-    this.configError = error;
+    this.currentDefinitions = definitions;
+    this.currentConfig = config;
+    this.currentConfigError = error;
     this.scheduleBroadcast();
   }
 
@@ -133,5 +160,5 @@ export class CrewHub {
 }
 
 function emptyRuntime(): AgentRuntime {
-  return { status: 'idle', statusAt: 0, files: [], history: [], tokensIn: 0, tokensOut: 0, activeTasks: 0 };
+  return { status: 'idle', statusAt: 0, files: [], history: [], usage: emptyUsage(), activeTasks: 0 };
 }

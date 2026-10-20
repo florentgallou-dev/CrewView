@@ -4,7 +4,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { JsonlTailer } from './tail';
-import type { SessionTracker, SubagentMeta } from './tracker';
+import { timeOf, type SessionTracker, type SubagentMeta } from './tracker';
 
 const POLL_MS = 400;
 const SESSION_SCAN_EVERY = 5;
@@ -23,6 +23,7 @@ export class SessionWatcher {
   private tracker?: SessionTracker;
   private mainTail?: JsonlTailer;
   private readonly subTails = new Map<string, JsonlTailer>();
+  private readonly subMeta = new Map<string, SubagentMeta>();
   private knownFiles?: Set<string>;
 
   constructor(
@@ -88,20 +89,26 @@ export class SessionWatcher {
   private attach(session: SessionFile): void {
     this.current = session;
     this.subTails.clear();
+    this.subMeta.clear();
     const tracker = this.createTracker();
     this.tracker = tracker;
     this.mainTail = new JsonlTailer(session.file);
     tracker.replaying = true;
-    for (const record of this.mainTail.readNew()) tracker.handleMain(record);
-    this.pollSubagents();
+    // Les fichiers sont relus ensemble, dans l'ordre chronologique : une notification de fin
+    // dans le fichier principal ne doit pas précéder les derniers messages du subagent.
+    const steps: { at: number; apply: () => void }[] = this.mainTail.readNew().map((record) => ({ at: timeOf(record), apply: () => tracker.handleMain(record) }));
+    this.pollSubagents((at, apply) => steps.push({ at, apply }));
+    steps.sort((a, b) => a.at - b.at).forEach((step) => step.apply());
     tracker.replaying = false;
     tracker.settle(Date.now());
     this.onAttach(tracker, path.basename(session.file, '.jsonl'));
   }
 
-  private pollSubagents(): void {
+  /** Lit les fichiers des subagents ; `defer` permet de différer le traitement (relecture triée). */
+  private pollSubagents(defer?: (at: number, apply: () => void) => void): void {
     const tracker = this.tracker;
     if (!tracker || !this.current) return;
+    const run = (at: number, apply: () => void) => (defer ? defer(at, apply) : apply());
     const dir = path.join(this.current.file.replace(/\.jsonl$/, ''), 'subagents');
     let names: string[] = [];
     try {
@@ -109,17 +116,26 @@ export class SessionWatcher {
     } catch {
       // Pas encore de subagent dans cette session.
     }
+    const fresh = new Set<string>();
     for (const name of names) {
       const fileAgentId = name.replace(/^agent-/, '').replace(/\.jsonl$/, '');
       if (!this.subTails.has(fileAgentId)) {
         const meta = readMeta(path.join(dir, name.replace(/\.jsonl$/, '.meta.json')));
         if (!meta) continue; // méta pas encore écrite : on réessaiera au prochain passage
-        tracker.registerSubagent(fileAgentId, meta);
         this.subTails.set(fileAgentId, new JsonlTailer(path.join(dir, name)));
+        fresh.add(fileAgentId);
+        this.subMeta.set(fileAgentId, meta);
       }
     }
     for (const [fileAgentId, tail] of this.subTails) {
-      for (const record of tail.readNew()) tracker.handleSubagent(fileAgentId, record);
+      const records = tail.readNew();
+      if (fresh.has(fileAgentId)) {
+        // Enregistré juste avant son premier message (même horodatage, l'ordre stable est conservé).
+        const meta = this.subMeta.get(fileAgentId)!;
+        const at = records.length ? timeOf(records[0]) : Date.now();
+        run(at, () => tracker.registerSubagent(fileAgentId, meta, at));
+      }
+      for (const record of records) run(timeOf(record), () => tracker.handleSubagent(fileAgentId, record));
     }
   }
 }

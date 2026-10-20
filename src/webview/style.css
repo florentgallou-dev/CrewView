@@ -373,3 +373,93 @@ button.link {
 button.link:hover {
   text-decoration: underline;
 }
+
+/* ---- Fiche agent : blocs repliables et consommation (navigateur) ---- */
+
+#panel details.fold > summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+#panel details.fold > summary::-webkit-details-marker {
+  display: none;
+}
+
+#panel details.fold > summary::before {
+  content: "›";
+  display: inline-block;
+  width: 10px;
+  transition: transform 0.15s;
+}
+
+#panel details.fold[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+#panel details.fold.section > summary {
+  margin: 16px 0 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+#panel details.fold.request {
+  border-top: 1px solid #eef0f2;
+}
+
+#panel details.fold.request > summary {
+  padding: 5px 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+#panel details.fold.request > :not(summary) {
+  margin-left: 14px;
+}
+
+#panel h4 {
+  margin: 10px 0 4px;
+  font-size: 12px;
+}
+
+#panel .summary-line {
+  margin: 0 0 6px;
+  font-size: 12px;
+}
+
+#panel dl.usage {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 0;
+  margin: 0 0 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+#panel dl.usage dt {
+  color: var(--muted);
+}
+
+#panel dl.usage dd {
+  margin: 0;
+  padding-left: 12px;
+  text-align: right;
+}
+
+#panel dl.usage .sub {
+  padding-left: 12px;
+  font-size: 12px;
+}
+
+#panel dl.usage .total {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+#panel dl.usage .cost {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid #eef0f2;
+}
