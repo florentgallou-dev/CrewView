@@ -19,6 +19,8 @@ export interface AgentDirectory {
 export interface TrackerEvents {
   onChange(): void;
   onDelegate(from: string, to: string, label: string): void;
+  /** Un agent a fini sa tâche : il va porter son rapport à l'agent principal. */
+  onReport(from: string, to: string): void;
 }
 
 export interface SubagentMeta {
@@ -263,6 +265,7 @@ export class SessionTracker {
     const runtime = this.runtimeOf(task.agentId);
     runtime.activeTasks = Math.max(0, runtime.activeTasks - 1);
     if (runtime.activeTasks === 0) this.apply(task.agentId, at, 'done', 'Tâche terminée', 'action');
+    if (!this.replaying && task.agentId !== this.main) this.events.onReport(task.agentId, this.main);
   }
 
   private resolveAgentType(type: string): string {

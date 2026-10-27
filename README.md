@@ -152,12 +152,25 @@ npm test           # tests unitaires (node:test)
 
 F5 dans VS Code lance une fenêtre de développement avec l'extension (`.vscode/launch.json`).
 
-Démo sans vraie session (utilisez un dossier Claude de démo, jamais votre `~/.claude`) :
+### Démo sans vraie session
 
 ```bash
-node scripts/simulate.mjs /chemin/projet-demo /tmp/claude-demo &
-node dist/cli.js /chemin/projet-demo --claude-dir /tmp/claude-demo
+npm run demo                     # une demande complète (≈ 2 min 30), dans le navigateur
+npm run demo -- --loop           # enchaîne les demandes en boucle
+npm run demo -- --speed 2        # deux fois plus vite
+npm run demo -- --port 4800 --no-open
 ```
+
+La démo crée un projet fictif avec cinq agents au format Copilot (Orchestrateur, Explorateur, Backend, Frontend, Revue Qualité) et joue une session Claude Code en écrivant de vrais transcripts. Tout se trouve sous `demo/`, ignoré par git, avec un dossier Claude isolé : votre `~/.claude` n'est jamais touché.
+
+Déroulé :
+1. Vous demandez l'export PDF des candidatures.
+2. L'Orchestrateur fait analyser l'existant par l'Explorateur, qui revient avec un plan en deux lots.
+3. L'Orchestrateur lance le Backend et le Frontend en parallèle. Le Frontend attend le contrat d'API publié par le Backend.
+4. La Revue Qualité trouve une anomalie d'accessibilité. Le Frontend est relancé pour la corriger, puis la Revue valide.
+5. L'Orchestrateur vous pose une question.
+
+Chaque agent qui termine sa tâche vient porter son rapport au bureau de l'Orchestrateur. Avec `--loop`, une seconde demande (l'export groupé) suit, puis le cycle recommence.
 
 Structure :
 

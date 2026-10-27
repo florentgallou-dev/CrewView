@@ -2,7 +2,7 @@
   "name": "crew-view",
   "displayName": "Crew View",
   "description": "Open-space isométrique animé en temps réel représentant les agents Claude Code d'un projet.",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "publisher": "digiworks",
   "license": "UNLICENSED",
   "private": true,
@@ -126,7 +126,8 @@
     "watch": "node esbuild.mjs --watch",
     "typecheck": "tsc --noEmit",
     "test": "node scripts/run-tests.mjs",
-    "package": "npm run build && vsce package --no-dependencies --allow-missing-repository --skip-license"
+    "package": "npm run build && vsce package --no-dependencies --allow-missing-repository --skip-license",
+    "demo": "npm run build && node scripts/demo.mjs"
   },
   "devDependencies": {
     "@types/node": "^20.17.0",

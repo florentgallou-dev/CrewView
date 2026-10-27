@@ -178,6 +178,7 @@ export type CrewCommand = 'crewView.open' | 'crewView.openInBrowser' | 'crewView
 export type HostMessage =
   | { type: 'state'; state: SceneState }
   | { type: 'delegate'; from: string; to: string; label: string }
+  | { type: 'report'; from: string; to: string }
   | { type: 'selection'; agentId?: string }
   | { type: 'settings'; data: SettingsData }
   | { type: 'ui'; folds: Record<string, boolean> };

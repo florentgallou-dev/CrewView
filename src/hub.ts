@@ -128,6 +128,7 @@ export class CrewHub {
           this.send({ type: 'state', state: this.snapshot() });
           this.send({ type: 'delegate', from, to, label });
         },
+        onReport: (from, to) => this.send({ type: 'report', from, to }),
       },
     );
   }

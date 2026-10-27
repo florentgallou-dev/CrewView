@@ -27,7 +27,7 @@ test('relecture : la notification de fin, écrite dans le fichier principal, pas
   let tracker: SessionTracker | undefined;
   const watcher = new SessionWatcher(
     dir,
-    () => new SessionTracker({ mainId: () => 'main', has: (id) => id === 'explorateur', nameOf: () => undefined }, { onChange: () => undefined, onDelegate: () => undefined }),
+    () => new SessionTracker({ mainId: () => 'main', has: (id) => id === 'explorateur', nameOf: () => undefined }, { onChange: () => undefined, onDelegate: () => undefined, onReport: () => undefined }),
     (attached) => (tracker = attached),
   );
   watcher.start();

@@ -83,7 +83,8 @@ function onMessage(message: HostMessage): void {
     renderHeader();
     renderDialog();
     if (selectedId) renderPanel();
-  } else if (message.type === 'delegate') {
+  } else if (message.type === 'delegate' || message.type === 'report') {
+    // Délégation : l'orchestrateur apporte le dossier ; rapport : l'agent rapporte le sien.
     deliver(message.from, message.to);
   } else if (message.type === 'selection') {
     selectedId = message.agentId;

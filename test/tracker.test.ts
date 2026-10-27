@@ -6,11 +6,12 @@ const KNOWN: Record<string, string> = { orchestrateur: 'Orchestrateur', explorat
 
 function setup() {
   const delegations: [string, string, string][] = [];
+  const reports: [string, string][] = [];
   const tracker = new SessionTracker(
     { mainId: () => 'orchestrateur', has: (id) => id in KNOWN, nameOf: (id) => KNOWN[id] },
-    { onChange: () => undefined, onDelegate: (from, to, label) => delegations.push([from, to, label]) },
+    { onChange: () => undefined, onDelegate: (from, to, label) => delegations.push([from, to, label]), onReport: (from, to) => reports.push([from, to]) },
   );
-  return { tracker, delegations, status: (id: string) => tracker.runtimeOf(id).status };
+  return { tracker, delegations, reports, status: (id: string) => tracker.runtimeOf(id).status };
 }
 
 let seq = 0;
@@ -27,7 +28,7 @@ test('une demande met l’agent principal en réflexion et alimente le dialogue'
 });
 
 test('délégation à un agent du projet : animation, tâche, puis fin via la notification', () => {
-  const { tracker, delegations, status } = setup();
+  const { tracker, delegations, reports, status } = setup();
   tracker.handleMain(assistant([{ type: 'tool_use', id: 't1', name: 'Agent', input: { subagent_type: 'Explorateur', description: 'Analyser' } }]));
   tracker.handleMain({ type: 'user', timestamp: at(), message: { content: [{ type: 'tool_result', tool_use_id: 't1' }] }, toolUseResult: { isAsync: true, status: 'async_launched' } });
   assert.deepEqual(delegations, [['orchestrateur', 'explorateur', 'Analyser']]);
@@ -39,8 +40,12 @@ test('délégation à un agent du projet : animation, tâche, puis fin via la no
   assert.deepEqual(tracker.runtimeOf('explorateur').files, ['/p/src/app.ts']);
   assert.equal(tracker.runtimeOf('explorateur').bubble?.text, 'Lit app.ts');
 
+  assert.deepEqual(reports, []);
   tracker.handleMain({ type: 'user', timestamp: at(), origin: { kind: 'task-notification' }, message: { content: '<task-notification>\n<tool-use-id>t1</tool-use-id>' } });
   assert.equal(status('explorateur'), 'done');
+  assert.deepEqual(reports, [['explorateur', 'orchestrateur']], 'l’agent va porter son rapport');
+  tracker.handleMain({ type: 'user', timestamp: at(), origin: { kind: 'task-notification' }, message: { content: '<task-notification>\n<tool-use-id>t1</tool-use-id>' } });
+  assert.equal(reports.length, 1, 'une seule fois par tâche');
 });
 
 test('un type d’agent inconnu devient un intérimaire', () => {
