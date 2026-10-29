@@ -1,0 +1,50 @@
+// Fichiers d'un thème graphique (chemins relatifs au dossier du thème), communs à l'extension et à la scène.
+
+export const THEME_FILES = [
+  'mobilier/bureau.svg',
+  'mobilier/bureau-chef.svg',
+  'mobilier/poste-partage.svg',
+  'mobilier/moniteur.svg',
+  'mobilier/portable.svg',
+  'decor/sol.svg',
+  'decor/mur-fond.svg',
+  'decor/mur-gauche.svg',
+  'decor/porte.svg',
+  'decor/enseigne.svg',
+  'decor/cadre.svg',
+  'decor/horloge.svg',
+  'decor/armoire.svg',
+  'decor/fontaine.svg',
+  'decor/plante.svg',
+  'accessoires/plante.svg',
+  'accessoires/lampe.svg',
+  'accessoires/tasse.svg',
+  'accessoires/livres.svg',
+  'accessoires/serveur.svg',
+  'accessoires/loupe.svg',
+  'accessoires/trophee.svg',
+  'accessoires/bouclier.svg',
+  'ecrans/veille.svg',
+  'ecrans/reflexion.svg',
+  'ecrans/lecture.svg',
+  'ecrans/ecriture.svg',
+  'ecrans/terminal.svg',
+  'ecrans/discussion.svg',
+  'ecrans/delegation.svg',
+  'ecrans/question.svg',
+  'ecrans/termine.svg',
+  'personnage/tete.svg',
+  'personnage/buste.svg',
+  'personnage/buste-dos.svg',
+  'personnage/bras.svg',
+  'personnage/avant-bras.svg',
+  'personnage/jambe.svg',
+  'personnage/articulation.svg',
+  'personnage/dossier.svg',
+  'personnage/pivots.json',
+] as const;
+
+export type ThemeFile = (typeof THEME_FILES)[number];
+
+/** Couches du thème, de la plus prioritaire (projet) à la moins prioritaire (thème par défaut) : chemin → contenu. */
+export type ThemeLayers = Record<string, string>[];

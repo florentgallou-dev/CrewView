@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 46 32" width="46" height="32">
+  <!-- Délégation : dossier. Étiré sur toute la dalle de l'écran. currentColor = couleur du statut. -->
+  <rect x="0" y="0" width="46" height="32" fill="#15191e"/>
+  <rect x="11.8" y="4.75" width="9.8" height="4.4" fill="currentColor"/><rect x="11.8" y="8.2" width="22.4" height="17.2" fill="currentColor"/>
+</svg>

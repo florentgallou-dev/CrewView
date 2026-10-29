@@ -5,13 +5,13 @@ import * as path from 'node:path';
 import { CONFIG_FILE, type AgentLookConfig, type CrewConfig } from './config';
 import { normalizeId } from './discovery';
 import type { CrewHub } from './hub';
-import { DESK_SLOTS, lookFor } from './layout';
+import { type DeskSlot, lookFor } from './layout';
 import type { Accessory, AgentPatch, Desk, ProjectPatch, SettingsAgent, SettingsData } from './types';
 
 export const ACCESSORIES: Accessory[] = ['none', 'plant', 'lamp', 'mug', 'books', 'server', 'magnifier', 'trophy', 'shield'];
 const TEMP_PREFIX = 'interim-';
 
-export function buildSettings(hub: CrewHub, general: { port: number; claudeConfigDir: string }): SettingsData {
+export function buildSettings(hub: CrewHub, general: { port: number; claudeConfigDir: string; themeDir: string }): SettingsData {
   const state = hub.snapshot();
   const config = hub.config;
   const definitions = hub.definitions;
@@ -39,7 +39,7 @@ export function buildSettings(hub: CrewHub, general: { port: number; claudeConfi
       hidden: Boolean(look.hidden),
       isMain: false,
       temp: false,
-      slot: desk ? slotIndex(desk[0], desk[1]) : -1,
+      slot: desk ? slotIndex(hub.slots, desk[0], desk[1]) : -1,
       desk,
     });
   }
@@ -62,10 +62,11 @@ export function buildSettings(hub: CrewHub, general: { port: number; claudeConfi
     agentsDirs: config.agentsDirs ?? [],
     definitions: definitions.map((d) => ({ id: d.id, name: d.name })),
     agents,
-    slots: DESK_SLOTS,
+    slots: hub.slots,
     accessories: ACCESSORIES,
     port: general.port,
     claudeConfigDir: general.claudeConfigDir,
+    themeDir: general.themeDir,
   };
 }
 
@@ -83,7 +84,7 @@ export function applyAgentPatch(hub: CrewHub, id: string, patch: AgentPatch): vo
       if (patch.hidden) look.hidden = true;
       else delete look.hidden;
     }
-    const slot = patch.slot !== undefined ? DESK_SLOTS[patch.slot] : undefined;
+    const slot = patch.slot !== undefined ? hub.slots[patch.slot] : undefined;
     if (slot) {
       // Poste occupé : les deux agents échangent leur place.
       const me = state.agents.find((a) => a.id === id);
@@ -140,8 +141,8 @@ function pruneLooks(config: CrewConfig): void {
   }
 }
 
-function slotIndex(x: number, y: number): number {
-  return DESK_SLOTS.findIndex((s) => Math.abs(s.x - x) < 0.01 && Math.abs(s.y - y) < 0.01);
+function slotIndex(slots: DeskSlot[], x: number, y: number): number {
+  return slots.findIndex((s) => Math.abs(s.x - x) < 0.01 && Math.abs(s.y - y) < 0.01);
 }
 
 function isAt(desk: Desk, x: number, y: number): boolean {

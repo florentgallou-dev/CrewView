@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-4 -23 16 25" width="16" height="25">
+  <!-- Lampe de bureau. Ancre (0,0) : point du plateau où l'accessoire est posé. currentColor = couleur de l'agent. -->
+  <polyline points="0,0 -2,-14 6,-19" fill="none" stroke="#3a3f46" stroke-width="1.6"/>
+  <polygon points="2,-20 11,-22 10,-14" fill="currentColor"/>
+</svg>

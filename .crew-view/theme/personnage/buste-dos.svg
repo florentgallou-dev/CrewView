@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-10 -1 30 43" width="30" height="43">
+  <!-- Buste de dos (au travail, face à l'écran). Ancre (0,0) : milieu des épaules. -->
+  <path d="M-9 9Q-9 0 0 0Q9 0 9 9L7 40H-7Z" fill="#16181b"/>
+  <line x1="0" y1="4" x2="0" y2="34" stroke="rgba(255,255,255,0.09)" stroke-width="1"/>
+</svg>

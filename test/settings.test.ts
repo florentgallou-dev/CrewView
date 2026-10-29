@@ -4,7 +4,7 @@ import * as path from 'node:path';
 import { test } from 'node:test';
 import { CONFIG_FILE } from '../src/config';
 import { CrewHub } from '../src/hub';
-import { applyTempLook, DESK_SLOTS, placeTemp } from '../src/layout';
+import { applyTempLook, placeTemp } from '../src/layout';
 import { applyAgentPatch, applyProjectPatch, buildSettings } from '../src/settings';
 import { COPILOT_EXPLORER, COPILOT_FRONT, COPILOT_ORCHESTRATOR, makeProject } from './helpers';
 
@@ -22,7 +22,7 @@ function setup(config?: unknown) {
   return { root, hub, read };
 }
 
-const general = { port: 4719, claudeConfigDir: '' };
+const general = { port: 4719, claudeConfigDir: '', themeDir: '' };
 
 test('paramètres : agent principal en tête, postes par défaut reconnus', () => {
   const { hub } = setup();
@@ -38,8 +38,8 @@ test('choisir un poste occupé échange les deux agents', () => {
   const { hub, read } = setup();
   applyAgentPatch(hub, 'explorateur', { slot: 1 });
   const agents = read().agents;
-  assert.deepEqual(agents.explorateur.desk, [DESK_SLOTS[1].x, DESK_SLOTS[1].y]);
-  assert.deepEqual(agents['frontend-builder'].desk, [DESK_SLOTS[0].x, DESK_SLOTS[0].y]);
+  assert.deepEqual(agents.explorateur.desk, [hub.slots[1].x, hub.slots[1].y]);
+  assert.deepEqual(agents['frontend-builder'].desk, [hub.slots[0].x, hub.slots[0].y]);
   const data = buildSettings(hub, general);
   assert.equal(data.agents.find((a) => a.id === 'explorateur')!.slot, 1);
   assert.equal(data.agents.find((a) => a.id === 'frontend-builder')!.slot, 0);
@@ -74,7 +74,7 @@ test('une configuration JSON invalide n’est jamais écrasée', () => {
 });
 
 test('apparence des intérimaires : nom, couleur, masquage', () => {
-  const temp = placeTemp('interim-explore', 'Explore', 0);
+  const temp = placeTemp('interim-explore', 'Explore', 0, { x: 8.6, y: 9.4 });
   assert.equal(applyTempLook(temp, { agents: { 'interim-explore': { label: 'Éclaireur', color: '#123456' } } })?.name, 'Éclaireur');
   assert.equal(applyTempLook(temp, { agents: { 'interim-explore': { hidden: true } } }), undefined);
   assert.equal(applyTempLook(temp, {})?.color, temp.color);

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 50.09 96" width="50.09" height="96">
+  <!-- Panneau du mur du fond, dessiné à plat (1,4 tuile de large × 3 de haut, 1 tuile ≈ 35,8 px), répété sur toute la longueur. Ancre (0,0) : coin haut-gauche. -->
+  <rect x="0" y="0" width="50.09" height="96" fill="#f7f8f9"/>
+  <rect x="0" y="92.16" width="50.09" height="3.84" fill="#d9dce0"/>
+  <path d="M0.5 0V92.16M0 32H50.09M0 64H50.09" stroke="rgba(0,0,0,0.055)" stroke-width="1"/>
+</svg>

@@ -118,7 +118,11 @@ function readAgent(root: string, file: string): AgentDefinition | undefined {
       ? 'claude'
       : 'generic';
 
-  const name = typeof data.name === 'string' && data.name.trim() ? data.name.trim() : path.basename(file).replace(/(\.agent)?\.md$/, '');
+  // Un agent se déclare par son frontmatter : un document ordinaire (cité dans AGENTS.md, README…) n'en est pas un.
+  const hasName = typeof data.name === 'string' && data.name.trim() !== '';
+  const hasDescription = typeof data.description === 'string' && data.description.trim() !== '';
+  if (!hasName && !hasDescription) return undefined;
+  const name = hasName ? (data.name as string).trim() : path.basename(file).replace(/(\.agent)?\.md$/, '');
   const tools = toStringList(data.tools);
   const delegatesTo = toStringList(data.agents).map(normalizeId);
   const id = normalizeId(name);

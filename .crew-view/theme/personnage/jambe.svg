@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -2.8 10 8.4" width="10" height="8.4">
+  <!-- Jambe (hanche → pied), visible pendant la marche. Dessiné à l'horizontale, de l'articulation (0,0) vers la droite, sur la longueur indiquée dans pivots.json (10) : il est tourné et étiré dans sa longueur pour relier les deux articulations. -->
+  <rect x="0" y="-2.3" width="10" height="4.6" fill="#16181b"/>
+</svg>

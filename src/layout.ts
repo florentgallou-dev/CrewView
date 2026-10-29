@@ -1,32 +1,38 @@
 // Placement des agents dans l'open-space et apparence par défaut.
+// La salle s'agrandit avec le nombre d'agents : grille de bureaux séparés par des couloirs,
+// grand bureau de l'agent principal au fond, table partagée des intérimaires après la dernière rangée.
 
 import type { AgentDefinition } from './discovery';
 import { normalizeId } from './discovery';
 import type { AgentLookConfig, CrewConfig } from './config';
-import type { Accessory, Desk } from './types';
-
-export const ROOM = { width: 14, depth: 11 };
+import type { Accessory, Desk, RoomLayout } from './types';
 
 export const PALETTE = ['#e8743b', '#19a979', '#5899da', '#bf399e', '#d4a20a', '#13a4b4', '#945ecf', '#d64550', '#6c8893', '#7fa035'];
 
 export const MAIN_ID = 'main';
 
-const BOSS_DESK: Desk = { x: 5.6, y: 1.0, w: 2.4, d: 1.0, kind: 'boss' };
 const DESK_W = 1.6;
 const DESK_D = 0.8;
+const BOSS = { w: 2.4, d: 1.0, y: 0.9 };
+const GRID = { x0: 1.4, y0: 3.8, colStep: 3.2, rowStep: 2.8 };
+const SHARED = { seat: 1.2, seats: 4, d: 0.8 };
+/** Marge libre autour de la grille (bords de salle, devant la dernière rangée). */
+const MARGIN = { side: 1.4, front: 1.9 };
+
 export interface DeskSlot {
   label: string;
   x: number;
   y: number;
 }
 
-// 10 postes : deux rangées de quatre, puis deux bureaux devant à gauche (la droite est l'espace intérim).
-export const DESK_SLOTS: DeskSlot[] = [
-  ...[3.8, 6.6].flatMap((y, row) => [1.4, 4.6, 7.8, 11.0].map((x, i) => ({ label: `Rangée ${row + 1} – poste ${i + 1}`, x, y }))),
-  { label: 'Avant – poste 1', x: 1.4, y: 9.4 },
-  { label: 'Avant – poste 2', x: 4.6, y: 9.4 },
-];
-const SHARED_TABLE = { x: 8.6, y: 9.4, d: 0.8, seat: 1.2, seats: 4 };
+export interface OfficeLayout {
+  agents: PlacedAgent[];
+  room: RoomLayout;
+  /** Postes de la grille, proposés dans l'écran de paramètres. */
+  slots: DeskSlot[];
+  /** Coin arrière-gauche de la table partagée des intérimaires. */
+  shared: { x: number; y: number };
+}
 
 export interface PlacedAgent {
   id: string;
@@ -41,9 +47,9 @@ export interface PlacedAgent {
   temp: boolean;
 }
 
-/** Point où l'agent se tient : derrière son bureau, face à la salle. */
+/** Point où l'agent se tient : devant son bureau, face à son écran. */
 export function standingSpot(desk: Desk): [number, number] {
-  return [desk.x + desk.w * 0.62, desk.y - 0.32];
+  return [desk.x + desk.w * 0.62, desk.y + desk.d + 0.35];
 }
 
 export function guessAccessory(text: string): Accessory {
@@ -57,11 +63,29 @@ export function guessAccessory(text: string): Accessory {
   return 'mug';
 }
 
+/** Colonnes de bureaux : 4 jusqu'à 8 agents, 5 jusqu'à 15, 6 au-delà. */
+function columnsFor(count: number): number {
+  return count <= 8 ? 4 : count <= 15 ? 5 : 6;
+}
+
+/** Grille de postes pour `count` agents spécialisés (au moins deux rangées). */
+export function gridSlots(count: number): DeskSlot[] {
+  const cols = columnsFor(count);
+  const rows = Math.max(2, Math.ceil(count / cols));
+  const slots: DeskSlot[] = [];
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      slots.push({ label: `Rangée ${row + 1} – poste ${col + 1}`, x: GRID.x0 + col * GRID.colStep, y: GRID.y0 + row * GRID.rowStep });
+    }
+  }
+  return slots;
+}
+
 /**
- * Place l'agent principal au grand bureau, les agents définis sur les rangées
- * de bureaux, et laisse la table partagée aux intérimaires (placés à la volée).
+ * Place l'agent principal au grand bureau, les agents définis sur la grille,
+ * et calcule la salle (dimensions, couloirs, table des intérimaires).
  */
-export function placeAgents(definitions: AgentDefinition[], config: CrewConfig): PlacedAgent[] {
+export function placeAgents(definitions: AgentDefinition[], config: CrewConfig): OfficeLayout {
   const lookOf = (id: string) => lookFor(config, id);
   const visible = definitions.filter((d) => !lookOf(d.id).hidden);
 
@@ -69,16 +93,21 @@ export function placeAgents(definitions: AgentDefinition[], config: CrewConfig):
   const orchestrator = visible.find((d) => d.id === orchestratorId);
   const specialists = visible.filter((d) => d !== orchestrator);
 
-  const placed: PlacedAgent[] = [];
+  const cols = columnsFor(specialists.length);
+  const slots = gridSlots(specialists.length);
+  const rows = slots.length / cols;
+  const gridWidth = GRID.x0 + (cols - 1) * GRID.colStep + DESK_W + MARGIN.side;
+
+  const agents: PlacedAgent[] = [];
   const mainLook = lookOf(orchestrator?.id ?? MAIN_ID);
-  placed.push({
+  agents.push({
     id: orchestrator?.id ?? MAIN_ID,
     name: mainLook.label ?? orchestrator?.name ?? 'Claude',
     description: orchestrator?.description ?? 'Session principale de Claude Code.',
     source: orchestrator?.source,
     color: mainLook.color ?? '#1f2328',
     accessory: mainLook.accessory ?? 'trophy',
-    desk: withPosition(BOSS_DESK, mainLook.desk),
+    desk: withPosition({ x: gridWidth / 2 - BOSS.w / 2, y: BOSS.y, w: BOSS.w, d: BOSS.d, kind: 'boss' }, mainLook.desk),
     spot: [0, 0],
     isMain: true,
     temp: false,
@@ -86,32 +115,45 @@ export function placeAgents(definitions: AgentDefinition[], config: CrewConfig):
 
   specialists.forEach((definition, index) => {
     const look = lookOf(definition.id);
-    const { x: column, y: row } = DESK_SLOTS[index % DESK_SLOTS.length];
-    placed.push({
+    const slot = slots[index];
+    agents.push({
       id: definition.id,
       name: look.label ?? definition.name,
       description: definition.description,
       source: definition.source,
       color: look.color ?? PALETTE[index % PALETTE.length],
       accessory: look.accessory ?? guessAccessory(`${definition.name} ${definition.description}`),
-      desk: withPosition({ x: column, y: row, w: DESK_W, d: DESK_D, kind: 'desk' }, look.desk),
+      desk: withPosition({ x: slot.x, y: slot.y, w: DESK_W, d: DESK_D, kind: 'desk' }, look.desk),
       spot: [0, 0],
       isMain: false,
       temp: false,
     });
   });
+  for (const agent of agents) agent.spot = standingSpot(agent.desk);
 
-  for (const agent of placed) agent.spot = standingSpot(agent.desk);
-  return placed;
+  // Les postes personnalisés (configuration) peuvent sortir de la grille : la salle s'adapte.
+  const sharedY = GRID.y0 + rows * GRID.rowStep;
+  const width = Math.max(gridWidth, ...agents.map((a) => a.desk.x + a.desk.w + MARGIN.side));
+  const depth = Math.max(sharedY + SHARED.d + MARGIN.front, ...agents.map((a) => a.desk.y + a.desk.d + MARGIN.front));
+  const aisles = [GRID.x0 / 2];
+  for (let col = 0; col < cols - 1; col++) aisles.push(GRID.x0 + col * GRID.colStep + DESK_W + (GRID.colStep - DESK_W) / 2);
+  aisles.push(width - 0.7);
+
+  return {
+    agents,
+    room: { width: round(width), depth: round(depth), aisles: aisles.map(round) },
+    slots,
+    shared: { x: round(width - 1.0 - SHARED.seats * SHARED.seat), y: round(sharedY) },
+  };
 }
 
 /** Place sur la table partagée pour le n-ième intérimaire (au-delà de 4, les places sont partagées). */
-export function placeTemp(id: string, name: string, slot: number): PlacedAgent {
+export function placeTemp(id: string, name: string, slot: number, shared: OfficeLayout['shared']): PlacedAgent {
   const desk: Desk = {
-    x: SHARED_TABLE.x + (slot % SHARED_TABLE.seats) * SHARED_TABLE.seat,
-    y: SHARED_TABLE.y,
-    w: SHARED_TABLE.seat,
-    d: SHARED_TABLE.d,
+    x: shared.x + (slot % SHARED.seats) * SHARED.seat,
+    y: shared.y,
+    w: SHARED.seat,
+    d: SHARED.d,
     kind: 'shared',
   };
   return {
@@ -144,3 +186,5 @@ function withPosition(desk: Desk, position?: [number, number]): Desk {
   if (!Array.isArray(position) || position.length !== 2) return desk;
   return { ...desk, x: Number(position[0]) || desk.x, y: Number(position[1]) || desk.y };
 }
+
+const round = (n: number) => Math.round(n * 100) / 100;

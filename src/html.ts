@@ -34,6 +34,7 @@ export function renderPage(options: PageOptions): string {
     <strong id="project">Crew View</strong>
     <span id="session"></span>
   </header>
+  <button id="recenter" hidden title="Recentrer la vue (ou double-clic dans la salle)">⤢ Recentrer</button>
   <div id="notice" hidden></div>
   <div id="dialog" hidden><span id="dialog-speaker"></span><span id="dialog-text"></span></div>
   <aside id="panel" hidden></aside>

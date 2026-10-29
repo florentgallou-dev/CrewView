@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-18 -10 29 27" width="29" height="27">
+  <!-- Ordinateur portable de la table partagée. Ancre (0,0) : coin arrière, sur le plateau. La dalle est dessinée par-dessus. -->
+  <polygon points="-16,8 -1.92,15.04 -1.92,14.08 -16,7.04" fill="#52565e"/>
+  <polygon points="7.68,10.24 -1.92,15.04 -1.92,14.08 7.68,9.28" fill="#474b51"/>
+  <polygon points="-6.4,2.24 7.68,9.28 -1.92,14.08 -16,7.04" fill="#686d74"/>
+  <polygon points="-6.08,2.08 8,9.12 8,0.16 -6.08,-6.88" fill="#34393f"/>
+  <polygon points="9.6,8.32 8,9.12 8,0.16 9.6,-0.64" fill="#2d3137"/>
+  <polygon points="-4.48,-7.68 9.6,-0.64 8,0.16 -6.08,-6.88" fill="#4a4e55"/>
+</svg>

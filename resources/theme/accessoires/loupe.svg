@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-7 -13 17 17" width="17" height="17">
+  <!-- Loupe. Ancre (0,0) : point du plateau où l'accessoire est posé. currentColor = couleur de l'agent. -->
+  <circle cx="0" cy="-6" r="4.5" fill="rgba(160,200,235,0.5)" stroke="#3a3f46" stroke-width="1.8"/>
+  <line x1="3.2" y1="-2.8" x2="8" y2="1.5" stroke="#3a3f46" stroke-width="1.8"/>
+</svg>

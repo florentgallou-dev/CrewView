@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 46 32" width="46" height="32">
+  <!-- Attente de votre réponse. Étiré sur toute la dalle de l'écran. currentColor = couleur du statut. -->
+  <rect x="0" y="0" width="46" height="32" fill="#15191e"/>
+  <text x="23" y="25" text-anchor="middle" font-family="'Segoe UI', system-ui, sans-serif" font-size="24" font-weight="700" fill="currentColor">?</text>
+</svg>

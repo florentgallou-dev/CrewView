@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-5 -11 10 12" width="10" height="12">
+  <!-- Tasse. Ancre (0,0) : point du plateau où l'accessoire est posé. currentColor = couleur de l'agent. -->
+  <rect x="-3.5" y="-8" width="7" height="8" fill="currentColor"/>
+  <ellipse cx="0" cy="-8" rx="3.5" ry="1.5" fill="currentColor"/>
+  <ellipse cx="0" cy="-8" rx="3.5" ry="1.5" fill="rgba(0,0,0,0.4)"/>
+</svg>

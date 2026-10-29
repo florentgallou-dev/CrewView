@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-24 -51 48 66" width="48" height="66">
+  <!-- Grande plante en pot (la seconde plante de la salle est la même, réduite). Ancre (0,0) : coin arrière du pot au sol. -->
+  <polygon points="-13.44,6.72 0,13.44 0,1.28 -13.44,-5.44" fill="#c2bdb4"/>
+  <polygon points="13.44,6.72 0,13.44 0,1.28 13.44,-5.44" fill="#a8a49c"/>
+  <polygon points="0,-12.16 13.44,-5.44 0,1.28 -13.44,-5.44" fill="#dbd6cc"/>
+  <ellipse cx="0" cy="-25.04" rx="14" ry="12.6" fill="#5f8f4e"/>
+  <ellipse cx="-11.2" cy="-16.64" rx="11.2" ry="10.08" fill="#5f8f4e"/>
+  <ellipse cx="11.2" cy="-18.04" rx="11.2" ry="10.08" fill="#5f8f4e"/>
+  <ellipse cx="0" cy="-39.04" rx="11.2" ry="10.08" fill="#5f8f4e"/>
+  <ellipse cx="-7" cy="-33.44" rx="9.8" ry="8.82" fill="#5f8f4e"/>
+  <ellipse cx="8.4" cy="-32.04" rx="9.8" ry="8.82" fill="#5f8f4e"/>
+  <ellipse cx="-4.2" cy="-33.44" rx="7" ry="5.6" fill="rgba(255,255,255,0.12)"/>
+</svg>

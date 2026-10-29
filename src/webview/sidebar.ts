@@ -223,6 +223,9 @@ function renderSettings(): Child[] {
       field('Dossier de configuration Claude',
         textInput(d.claudeConfigDir, '~/.claude (par défaut)', (value) => post({ type: 'updateSetting', key: 'claudeConfigDir', value: value.trim() })),
       ),
+      field('Dossier de graphismes commun',
+        textInput(d.themeDir, 'aucun (thème par défaut)', (value) => post({ type: 'updateSetting', key: 'themeDir', value: value.trim() })),
+      ),
     ),
     section('Actions',
       el('div', { className: 'actions' },
@@ -230,6 +233,7 @@ function renderSettings(): Child[] {
         button('Ouvrir dans le navigateur', () => post({ type: 'command', command: 'crewView.openInBrowser' })),
         button('Générer les agents Claude Code', () => post({ type: 'command', command: 'crewView.generateClaudeAgents' })),
         button(d.configExists ? 'Ouvrir config.json' : 'Créer config.json', () => post({ type: 'command', command: 'crewView.initConfig' })),
+        button('Personnaliser les graphismes', () => post({ type: 'command', command: 'crewView.customizeTheme' })),
       ),
     ),
   ];

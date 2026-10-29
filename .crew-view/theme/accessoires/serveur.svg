@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-21 -42 37 61" width="37" height="61">
+  <!-- Baie serveur posée au sol contre le côté droit du bureau (0,45 × 0,6 × 1,25 tuile). Ancre (0,0) : coin arrière au sol. Les voyants sont animés par l'extension. -->
+  <polygon points="-19.2,9.6 -4.8,16.8 -4.8,-23.2 -19.2,-30.4" fill="#2a2f35" stroke="rgba(0,0,0,0.3)" stroke-width="0.75"/>
+  <polygon points="14.4,7.2 -4.8,16.8 -4.8,-23.2 14.4,-32.8" fill="#25292e" stroke="rgba(0,0,0,0.3)" stroke-width="0.75"/>
+  <polygon points="0,-40 14.4,-32.8 -4.8,-23.2 -19.2,-30.4" fill="#40444b" stroke="rgba(0,0,0,0.3)" stroke-width="0.75"/>
+</svg>

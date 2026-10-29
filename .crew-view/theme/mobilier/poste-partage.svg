@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-27 -26 67 60" width="67" height="60">
+  <!-- Place d'un intérimaire à la table partagée (1,2 × 0,8 tuile). Ancre (0,0) : coin arrière au sol. -->
+  <polygon points="-25.6,12.8 12.8,32 12.8,8 -25.6,-11.2" fill="#4f7fb3" stroke="rgba(0,0,0,0.12)" stroke-width="0.75"/>
+  <polygon points="38.4,19.2 12.8,32 12.8,8 38.4,-4.8" fill="#3f6893" stroke="rgba(0,0,0,0.12)" stroke-width="0.75"/>
+  <polygon points="0,-24 38.4,-4.8 12.8,8 -25.6,-11.2" fill="#f2f4f6" stroke="rgba(0,0,0,0.12)" stroke-width="0.75"/>
+</svg>

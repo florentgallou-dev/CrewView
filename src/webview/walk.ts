@@ -6,12 +6,12 @@ export type Vec2 = [number, number];
 
 const SPEED = 2.6; // tuiles par seconde
 const PAUSE_S = 1.1;
-/** Couloirs verticaux entre les colonnes de bureaux. */
-const AISLES_X = [0.7, 3.8, 7.0, 10.2, 13.4];
 
 export interface Stop {
   to: string;
   target: Vec2;
+  /** Durée de la halte (secondes) ; plus longue pour un rapport, le temps qu'un relais éventuel arrive. */
+  pause?: number;
 }
 
 export interface Walker {
@@ -25,35 +25,46 @@ export interface Walker {
   stride: number;
 }
 
-/** Point où l'on se tient pour remettre un dossier : devant le bureau. */
+/** Point où l'on se tient pour remettre un dossier : devant le bureau, à côté de l'agent. */
 export function visitorSpot(desk: Desk): Vec2 {
-  return [desk.x + desk.w * 0.5, desk.y + desk.d + 0.42];
+  return [desk.x + desk.w * 0.16, desk.y + desk.d + 0.8];
 }
 
-export function startDelivery(from: Vec2, stop: Stop, desks: Desk[]): Walker {
-  return { pos: [...from], path: route(from, stop.target, desks), stops: [stop], phase: 'toStop', pauseLeft: 0, carrying: true, facing: 1, stride: 0 };
+/** Plan de circulation : bureaux à contourner et couloirs verticaux. */
+export interface FloorPlan {
+  desks: Desk[];
+  aisles: number[];
 }
 
-export function startArrival(from: Vec2, home: Vec2, desks: Desk[]): Walker {
-  return { pos: [...from], path: route(from, home, desks), stops: [], phase: 'home', pauseLeft: 0, carrying: false, facing: 1, stride: 0 };
+export function startDelivery(from: Vec2, stop: Stop, plan: FloorPlan): Walker {
+  return { pos: [...from], path: route(from, stop.target, plan), stops: [stop], phase: 'toStop', pauseLeft: 0, carrying: true, facing: 1, stride: 0 };
 }
 
-export function addStop(walker: Walker, stop: Stop, desks: Desk[]): void {
+export function startArrival(from: Vec2, home: Vec2, plan: FloorPlan): Walker {
+  return { pos: [...from], path: route(from, home, plan), stops: [], phase: 'home', pauseLeft: 0, carrying: false, facing: 1, stride: 0 };
+}
+
+export function addStop(walker: Walker, stop: Stop, plan: FloorPlan): void {
   if (walker.phase === 'home') {
     walker.stops = [stop];
     walker.phase = 'toStop';
     walker.carrying = true;
-    walker.path = route(walker.pos, stop.target, desks);
+    walker.path = route(walker.pos, stop.target, plan);
   } else {
     walker.stops.push(stop);
   }
+}
+
+/** Le marcheur se rend (ou fait halte) chez `agentId`. */
+export function isHeadingTo(walker: Walker, agentId: string): boolean {
+  return walker.phase !== 'home' && walker.stops[0]?.to === agentId;
 }
 
 /**
  * Fait avancer le marcheur. Retourne 'arrived:<id>' quand un dossier est remis,
  * 'done' quand il est rentré à son poste, sinon undefined.
  */
-export function stepWalker(walker: Walker, dt: number, home: Vec2, desks: Desk[]): string | undefined {
+export function stepWalker(walker: Walker, dt: number, home: Vec2, plan: FloorPlan): string | undefined {
   if (walker.phase === 'pause') {
     walker.pauseLeft -= dt;
     if (walker.pauseLeft > 0) return undefined;
@@ -61,7 +72,7 @@ export function stepWalker(walker: Walker, dt: number, home: Vec2, desks: Desk[]
     const next = walker.stops[0];
     walker.phase = next ? 'toStop' : 'home';
     walker.carrying = Boolean(next);
-    walker.path = route(walker.pos, next ? next.target : home, desks);
+    walker.path = route(walker.pos, next ? next.target : home, plan);
     return undefined;
   }
 
@@ -86,7 +97,7 @@ export function stepWalker(walker: Walker, dt: number, home: Vec2, desks: Desk[]
 
   if (walker.phase === 'toStop') {
     walker.phase = 'pause';
-    walker.pauseLeft = PAUSE_S;
+    walker.pauseLeft = walker.stops[0]?.pause ?? PAUSE_S;
     walker.carrying = false;
     return `arrived:${walker.stops[0]?.to ?? ''}`;
   }
@@ -94,9 +105,9 @@ export function stepWalker(walker: Walker, dt: number, home: Vec2, desks: Desk[]
 }
 
 /** Trajet en L par un couloir vertical libre, évitant les bureaux. */
-export function route(from: Vec2, to: Vec2, desks: Desk[]): Vec2[] {
-  const candidates = [...AISLES_X].sort((a, b) => cost(a, from, to) - cost(b, from, to));
-  const aisle = candidates.find((x) => isClear(from, to, x, desks)) ?? candidates[0];
+export function route(from: Vec2, to: Vec2, plan: FloorPlan): Vec2[] {
+  const candidates = [...plan.aisles].sort((a, b) => cost(a, from, to) - cost(b, from, to));
+  const aisle = candidates.find((x) => isClear(from, to, x, plan.desks)) ?? candidates[0] ?? from[0];
   const path: Vec2[] = [[aisle, from[1]], [aisle, to[1]], to];
   return path.filter((p, i) => {
     const prev = i === 0 ? from : path[i - 1];

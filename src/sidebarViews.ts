@@ -128,7 +128,11 @@ export class CrewSidebar {
   private postSettings(force: boolean): void {
     if (!this.hub || !this.views.has('settings')) return;
     const general = vscode.workspace.getConfiguration('crewView');
-    const data = buildSettings(this.hub, { port: general.get<number>('port') ?? 4719, claudeConfigDir: general.get<string>('claudeConfigDir') ?? '' });
+    const data = buildSettings(this.hub, {
+      port: general.get<number>('port') ?? 4719,
+      claudeConfigDir: general.get<string>('claudeConfigDir') ?? '',
+      themeDir: general.get<string>('themeDir') ?? '',
+    });
     const signature = JSON.stringify(data);
     if (!force && signature === this.settingsSignature) return;
     this.settingsSignature = signature;

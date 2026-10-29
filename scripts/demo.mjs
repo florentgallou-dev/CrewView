@@ -5,6 +5,7 @@
 //   npm run demo -- --loop            enchaîne les demandes en boucle
 //   npm run demo -- --speed 2         deux fois plus vite
 //   npm run demo -- --port 4800 --no-open
+//   npm run demo -- --agents 16       une équipe plus grande (les agents ajoutés restent disponibles)
 //
 // Tout est écrit sous demo/ (projet fictif + dossier Claude isolé) : votre ~/.claude n'est jamais touché.
 // Les transcripts suivent le format de Claude Code : l'open-space les lit exactement comme une vraie session.
@@ -29,6 +30,7 @@ const SPEED = Math.max(0.1, Number(option('--speed', '1')) || 1);
 const PORT = option('--port', '4720');
 const LOOP = args.includes('--loop');
 const NO_OPEN = args.includes('--no-open');
+const TEAM_SIZE = Math.max(5, Math.min(30, Number(option('--agents', '5')) || 5));
 
 const MODELS = { main: 'claude-opus-5-5', worker: 'claude-sonnet-5-5', explorer: 'claude-haiku-5-5' };
 
@@ -68,10 +70,23 @@ const AGENTS = {
   },
 };
 
+/** Rôles supplémentaires pour tester une grande équipe (`--agents`). */
+const EXTRA_ROLES = ['DevOps', 'Données', 'Mobile', 'Sécurité', 'Tests', 'Documentation', 'UX', 'Performance', 'SEO', 'Traduction', 'Support', 'Intégrations', 'Paiement', 'Recherche', 'Analytique', 'Contenus', 'Emails', 'Archivage', 'Conformité', 'Accessibilité', 'Monitoring', 'Migration', 'Cache', 'Notifications', 'Import/Export'];
+
 function writeProject() {
   const dir = path.join(PROJECT, '.github', 'agents');
+  fs.rmSync(dir, { recursive: true, force: true });
   fs.mkdirSync(dir, { recursive: true });
-  for (const [file, agent] of Object.entries(AGENTS)) {
+  const team = { ...AGENTS };
+  for (const role of EXTRA_ROLES.slice(0, TEAM_SIZE - 5)) {
+    team[`${role.toLowerCase().normalize('NFD').replace(/[^a-z]/g, '-')}.agent.md`] = {
+      name: role,
+      description: `Spécialiste ${role.toLowerCase()} (agent de démonstration, sans rôle dans le scénario).`,
+      tools: ['read', 'search', 'edit'],
+      body: `Tu es le spécialiste ${role.toLowerCase()}.`,
+    };
+  }
+  for (const [file, agent] of Object.entries(team)) {
     const list = (values) => `[${values.map((v) => (/[^a-z]/i.test(v) ? JSON.stringify(v) : v)).join(', ')}]`;
     const lines = ['---', `name: ${JSON.stringify(agent.name)}`, `description: ${JSON.stringify(agent.description)}`, `tools: ${list(agent.tools)}`];
     if (agent.agents) lines.push(`agents: ${list(agent.agents)}`);
@@ -373,7 +388,7 @@ async function run() {
     if (code) process.exit(code);
   });
 
-  console.log(`\nDémo : ${LOOP ? 'en boucle' : 'une demande complète'}, vitesse ×${SPEED}. Ctrl+C pour quitter.\n`);
+  console.log(`\nDémo : ${LOOP ? 'en boucle' : 'une demande complète'}, ${TEAM_SIZE} agents, vitesse ×${SPEED}. Ctrl+C pour quitter.\n`);
   await sleep(3 * SPEED); // laisse le temps au navigateur de s'ouvrir, quelle que soit la vitesse
   const scenarios = [exportPdf, groupExport];
   for (let round = 0; ; round++) {

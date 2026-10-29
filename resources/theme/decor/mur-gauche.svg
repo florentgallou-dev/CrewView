@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 39.35 96" width="39.35" height="96">
+  <!-- Panneau du mur de gauche, à plat (1,1 tuile × 3), répété. Ancre (0,0) : coin haut-gauche vu de face (côté salle vers le fond). -->
+  <rect x="0" y="0" width="39.35" height="96" fill="#e6e8eb"/>
+  <rect x="0" y="92.16" width="39.35" height="3.84" fill="#cfd3d8"/>
+  <path d="M0.5 0V92.16M0 32H39.35M0 64H39.35" stroke="rgba(0,0,0,0.055)" stroke-width="1"/>
+</svg>

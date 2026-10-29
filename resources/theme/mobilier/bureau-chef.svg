@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-34 -26 113 82" width="113" height="82">
+  <!-- Bureau de l'agent principal (2,4 × 1 tuile). Ancre (0,0) : coin arrière au sol. -->
+  <polygon points="-32,16 44.8,54.4 44.8,30.4 -32,-8" fill="#8d5434" stroke="rgba(0,0,0,0.15)" stroke-width="0.75"/>
+  <polygon points="76.8,38.4 44.8,54.4 44.8,30.4 76.8,14.4" fill="#74432a" stroke="rgba(0,0,0,0.15)" stroke-width="0.75"/>
+  <polygon points="0,-24 76.8,14.4 44.8,30.4 -32,-8" fill="#b4724b" stroke="rgba(0,0,0,0.15)" stroke-width="0.75"/>
+  <polygon points="-27.2,13.6 -8,23.2 -8,8.8 -27.2,-0.8" fill="#7f4b2f" stroke="rgba(0,0,0,0.2)" stroke-width="0.75"/>
+  <polygon points="20.8,37.6 40,47.2 40,32.8 20.8,23.2" fill="#7f4b2f" stroke="rgba(0,0,0,0.2)" stroke-width="0.75"/>
+</svg>

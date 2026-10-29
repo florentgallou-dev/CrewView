@@ -1,13 +1,14 @@
-// Silhouettes pictogrammes (noir plein) et leurs postures selon l'activité.
+// Silhouettes pictogrammes et leurs postures selon l'activité.
+// Les pièces (tête, buste, membres, articulations) sont des images du thème, placées et tournées ici.
 
 import type { AgentStatus } from '../types';
 import { ellipse, type Point, withAlpha } from './iso';
+import { drawSegment, drawSprite, pivots } from './sprites';
 
-const INK = '#16181b';
 const HEAD_R = 7.2;
 const BODY_H = 40;
 
-export type Arms = 'none' | 'type' | 'chin' | 'raise' | 'stretch' | 'carry' | 'gesture';
+export type Arms = 'none' | 'type' | 'elbows' | 'chin' | 'scratch' | 'raise' | 'stretch' | 'carry' | 'gesture';
 
 export interface Pose {
   bob: number;
@@ -17,34 +18,44 @@ export interface Pose {
   /** Phase de marche, ou -1 à l'arrêt. */
   walk: number;
   facing: 1 | -1;
+  /** De dos, face à son écran (le badge de poitrine n'est alors pas visible). */
+  back: boolean;
 }
 
-/** Posture d'un agent à son poste selon son statut. `since` = secondes depuis le changement de statut. */
+/**
+ * Posture d'un agent à son poste selon son statut. `since` = secondes depuis le changement de statut.
+ * Au travail, l'agent est de dos, tourné vers son écran (à sa droite à l'écran) ;
+ * au repos, quand il parle, attend une réponse ou a fini, il se retourne vers la salle.
+ */
 export function poseFor(status: AgentStatus, t: number, since: number, seed: number): Pose {
-  const pose: Pose = { bob: 0, headDx: 0, headDy: 0, arms: 'none', walk: -1, facing: 1 };
+  const pose: Pose = { bob: 0, headDx: 0, headDy: 0, arms: 'none', walk: -1, facing: 1, back: false };
   switch (status) {
     case 'idle':
       pose.bob = Math.sin(t * 1.4 + seed) * 0.6;
       pose.headDx = Math.sin(t * 0.45 + seed * 3) > 0.7 ? 1.4 : Math.sin(t * 0.45 + seed * 3) < -0.8 ? -1.4 : 0;
       break;
     case 'thinking':
-      pose.arms = 'chin';
-      pose.headDx = 0.8;
+      pose.back = true;
+      pose.arms = 'scratch';
+      pose.headDx = 0.6;
       pose.headDy = -0.6 + Math.sin(t * 1.2 + seed) * 0.5;
       break;
     case 'reading':
-      pose.headDx = -2;
-      pose.headDy = 1.8;
+      pose.back = true;
+      pose.headDx = 1.6;
+      pose.headDy = 2.2;
       pose.bob = Math.sin(t * 0.8 + seed) * 0.4;
       break;
     case 'writing':
-      pose.arms = 'type';
-      pose.headDx = -1.2;
-      pose.headDy = 1.2;
+      pose.back = true;
+      pose.arms = 'elbows';
+      pose.headDx = 1.4;
+      pose.headDy = 1.4;
       break;
     case 'running':
-      pose.arms = 'type';
-      pose.headDx = -2.2;
+      pose.back = true;
+      pose.arms = 'elbows';
+      pose.headDx = 2;
       pose.headDy = 0.6;
       break;
     case 'talking':
@@ -73,6 +84,7 @@ export function drawFigure(ctx: CanvasRenderingContext2D, foot: Point, pose: Pos
   const baseline = foot.y - pose.bob;
   const bodyBottom = walking ? baseline - 9 : baseline;
   const top = baseline - BODY_H;
+  const pv = pivots();
 
   // Ombre et anneau d'état
   ctx.fillStyle = 'rgba(0,0,0,0.16)';
@@ -85,52 +97,39 @@ export function drawFigure(ctx: CanvasRenderingContext2D, foot: Point, pose: Pos
     ctx.stroke();
   }
 
-  ctx.fillStyle = INK;
-  ctx.strokeStyle = INK;
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-
   if (walking) {
     const swing = Math.sin(pose.walk) * 4;
-    ctx.lineWidth = 4.6;
-    ctx.beginPath();
-    ctx.moveTo(x - 2.6, bodyBottom - 2);
-    ctx.lineTo(x - 2.6 + swing, baseline - 1);
-    ctx.moveTo(x + 2.6, bodyBottom - 2);
-    ctx.lineTo(x + 2.6 - swing, baseline - 1);
-    ctx.stroke();
+    for (const side of [-1, 1]) {
+      const hip = { x: x + side * pv.hanche[0], y: bodyBottom + pv.hanche[1] };
+      limb(ctx, 'personnage/jambe.svg', pv.longueurs.jambe, [hip, { x: hip.x - side * swing, y: baseline - 1 }]);
+    }
   }
 
-  // Corps : épaules arrondies, légèrement évasé vers le bas
-  ctx.beginPath();
-  ctx.moveTo(x - 9, top + 9);
-  ctx.quadraticCurveTo(x - 9, top, x, top);
-  ctx.quadraticCurveTo(x + 9, top, x + 9, top + 9);
-  ctx.lineTo(x + 7, bodyBottom);
-  ctx.lineTo(x - 7, bodyBottom);
-  ctx.closePath();
-  ctx.fill();
-
-  // Tête, détachée du corps comme sur un pictogramme
-  ctx.beginPath();
-  ctx.arc(x + pose.headDx, top - HEAD_R - 2.2 + pose.headDy, HEAD_R, 0, Math.PI * 2);
-  ctx.fill();
+  // Corps (compressé en hauteur pendant la marche, les jambes apparaissent dessous), puis tête détachée.
+  drawSprite(ctx, pose.back ? 'personnage/buste-dos.svg' : 'personnage/buste.svg', { x, y: top }, accent, 1, (bodyBottom - top) / BODY_H);
+  drawSprite(ctx, 'personnage/tete.svg', { x: x + pv.tete[0] + pose.headDx, y: top + pv.tete[1] + pose.headDy });
 
   drawArms(ctx, x, top, pose, accent, t);
+}
 
-  // Badge de couleur de l'agent
-  ctx.fillStyle = accent;
-  ctx.beginPath();
-  ctx.roundRect(x + 2, top + 9, 4.5, 6, 1.2);
-  ctx.fill();
+/** Membre en deux segments au plus (bras + avant-bras, ou jambe), avec ses articulations. */
+function limb(ctx: CanvasRenderingContext2D, name: string, nominal: number, points: Point[], forearm?: { name: string; nominal: number }): void {
+  drawSegment(ctx, name, points[0], points[1], nominal);
+  if (points[2] && forearm) drawSegment(ctx, forearm.name, points[1], points[2], forearm.nominal);
+  for (const p of points) drawSprite(ctx, 'personnage/articulation.svg', p);
 }
 
 function drawArms(ctx: CanvasRenderingContext2D, x: number, top: number, pose: Pose, accent: string, t: number): void {
+  const pv = pivots();
+  // Les postures sont décrites pour des épaules en (±8, 6) : elles suivent l'épaule définie dans pivots.json.
   const arm = (points: [number, number][]) => {
-    ctx.lineWidth = 4.2;
-    ctx.beginPath();
-    points.forEach(([px, py], i) => (i ? ctx.lineTo(x + px, top + py) : ctx.moveTo(x + px, top + py)));
-    ctx.stroke();
+    const side = Math.sign(points[0][0]) || 1;
+    const dx = (pv.epaule[0] - 8) * side;
+    const dy = pv.epaule[1] - 6;
+    limb(ctx, 'personnage/bras.svg', pv.longueurs.bras, points.map(([px, py]) => ({ x: x + px + dx, y: top + py + dy })), {
+      name: 'personnage/avant-bras.svg',
+      nominal: pv.longueurs['avant-bras'],
+    });
   };
   switch (pose.arms) {
     case 'type': {
@@ -140,8 +139,20 @@ function drawArms(ctx: CanvasRenderingContext2D, x: number, top: number, pose: P
       arm([[8, 6], [12, 14], [9, 19 + b]]);
       break;
     }
+    case 'elbows': {
+      // De dos : les mains sont sur le clavier, seuls les coudes bougent.
+      const a = Math.sin(t * 20) * 1.4;
+      const b = Math.sin(t * 20 + 2) * 1.4;
+      arm([[-8, 6], [-12.5, 14 + a], [-7, 19]]);
+      arm([[8, 6], [12.5, 14 + b], [7, 19]]);
+      break;
+    }
     case 'chin':
       arm([[8, 6], [13, 15], [5, 2]]);
+      break;
+    case 'scratch':
+      // De dos : main à l'arrière de la tête.
+      arm([[8, 5], [13.5, -2], [5, -11 + Math.sin(t * 5) * 1.2]]);
       break;
     case 'raise':
       arm([[8, 5], [12, -6], [13, -18 + Math.sin(t * 6) * 1.5]]);
@@ -156,13 +167,7 @@ function drawArms(ctx: CanvasRenderingContext2D, x: number, top: number, pose: P
     case 'carry': {
       const f = pose.facing;
       arm([[8 * f, 6], [12 * f, 14], [14 * f, 12]]);
-      ctx.fillStyle = accent;
-      ctx.beginPath();
-      ctx.roundRect(x + 11 * f - 4.5, top + 5, 9, 11, 1.5);
-      ctx.fill();
-      ctx.fillStyle = 'rgba(255,255,255,0.85)';
-      ctx.fillRect(x + 11 * f - 3, top + 7, 6, 1.4);
-      ctx.fillStyle = INK;
+      drawSprite(ctx, 'personnage/dossier.svg', { x: x + pv.dossier[0] * f, y: top + pv.dossier[1] }, accent);
       break;
     }
     default:

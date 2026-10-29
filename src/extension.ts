@@ -11,6 +11,7 @@ import { CrewHub } from './hub';
 import { placeAgents } from './layout';
 import { startServer, type RunningServer } from './server';
 import { CrewSidebar } from './sidebarViews';
+import { copyDefaultTheme, defaultThemeDir, PROJECT_THEME_DIR } from './theme';
 import type { ClientMessage } from './types';
 
 /** Un hub par projet, partagé par le panneau, le navigateur et la barre latérale. */
@@ -20,9 +21,13 @@ const servers = new Map<string, Promise<RunningServer>>();
 const selections = new Map<string, string | undefined>();
 let currentRoot: string | undefined;
 let sidebar: CrewSidebar | undefined;
+/** Journal de diagnostic : Affichage › Sortie › Crew View. */
+let output: vscode.OutputChannel | undefined;
 
 export function activate(context: vscode.ExtensionContext): void {
   currentRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  output = vscode.window.createOutputChannel('Crew View');
+  context.subscriptions.push(output);
   sidebar = new CrewSidebar(context.extensionUri, {
     currentRoot: () => currentRoot,
     acquireHub,
@@ -51,11 +56,19 @@ export function activate(context: vscode.ExtensionContext): void {
       const root = await pickRoot();
       if (root) await initConfig(root);
     }),
+    vscode.commands.registerCommand('crewView.customizeTheme', async () => {
+      const root = await pickRoot();
+      if (root) await customizeTheme(root);
+    }),
     vscode.workspace.onDidChangeWorkspaceFolders(() => {
       const folders = vscode.workspace.workspaceFolders ?? [];
       if (!folders.some((f) => f.uri.fsPath === currentRoot)) setCurrentRoot(folders[0]?.uri.fsPath);
     }),
     vscode.workspace.onDidChangeConfiguration((event) => {
+      if (event.affectsConfiguration('crewView.themeDir')) {
+        const themeDir = vscode.workspace.getConfiguration('crewView').get<string>('themeDir');
+        for (const { hub } of hubs.values()) hub.setThemeDir(themeDir);
+      }
       if (event.affectsConfiguration('crewView')) sidebar?.refreshSettings();
     }),
   );
@@ -98,8 +111,10 @@ function setCurrentRoot(root: string | undefined): void {
 function acquireHub(root: string): CrewHub {
   let entry = hubs.get(root);
   if (!entry) {
-    const claudeConfigDir = vscode.workspace.getConfiguration('crewView').get<string>('claudeConfigDir');
-    const hub = new CrewHub({ root, claudeConfigDir });
+    const settings = vscode.workspace.getConfiguration('crewView');
+    const project = path.basename(root);
+    const log = (line: string) => output?.appendLine(`[${new Date().toLocaleTimeString('fr-FR')}] [${project}] ${line}`);
+    const hub = new CrewHub({ root, claudeConfigDir: settings.get<string>('claudeConfigDir'), themeDir: settings.get<string>('themeDir'), log });
     hub.start();
     entry = { hub, users: 0 };
     hubs.set(root, entry);
@@ -229,11 +244,25 @@ async function generateClaudeAgents(root: string): Promise<void> {
   if (open && written[0]) await vscode.window.showTextDocument(vscode.Uri.file(path.join(root, written[0])));
 }
 
+/** Copie le thème par défaut dans le projet (sans écraser les fichiers déjà personnalisés) et l'affiche. */
+async function customizeTheme(root: string): Promise<void> {
+  const copied = copyDefaultTheme(root, defaultThemeDir());
+  const dir = vscode.Uri.file(path.join(root, PROJECT_THEME_DIR));
+  void vscode.window.showInformationMessage(
+    copied.length
+      ? `Crew View : ${copied.length} fichier(s) copié(s) dans ${PROJECT_THEME_DIR}. Modifiez-les : l’open-space se met à jour à l’enregistrement.`
+      : `Crew View : le thème du projet est déjà complet (${PROJECT_THEME_DIR}).`,
+  );
+  await vscode.commands.executeCommand('revealInExplorer', dir);
+  const readme = vscode.Uri.joinPath(dir, 'README.md');
+  if (fs.existsSync(readme.fsPath)) await vscode.commands.executeCommand('markdown.showPreview', readme);
+}
+
 async function initConfig(root: string): Promise<void> {
   const file = path.join(root, CONFIG_FILE);
   if (!fs.existsSync(file)) {
     const { config } = loadConfig(root);
-    const placed = placeAgents(discoverAgents(root, config.agentsDirs), config);
+    const placed = placeAgents(discoverAgents(root, config.agentsDirs), config).agents;
     const main = placed.find((a) => a.isMain);
     const initial: CrewConfig = {
       agentsDirs: [],

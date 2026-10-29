@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-23 -45 44 67" width="44" height="67">
+  <!-- Armoire contre le mur de gauche (0,6 × 0,65 × 1,35 tuile). Ancre (0,0) : coin arrière au sol. -->
+  <polygon points="-20.8,10.4 -1.6,20 -1.6,-23.2 -20.8,-32.8" fill="#a7abb1" stroke="rgba(0,0,0,0.08)" stroke-width="0.75"/>
+  <polygon points="19.2,9.6 -1.6,20 -1.6,-23.2 19.2,-33.6" fill="#90949a" stroke="rgba(0,0,0,0.08)" stroke-width="0.75"/>
+  <polygon points="0,-43.2 19.2,-33.6 -1.6,-23.2 -20.8,-32.8" fill="#bfc3ca" stroke="rgba(0,0,0,0.08)" stroke-width="0.75"/>
+</svg>

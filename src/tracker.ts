@@ -3,8 +3,7 @@
 // ouvre une tâche confiée à un agent du projet, ou à un intérimaire si le type n'est pas défini.
 
 import { normalizeId } from './discovery';
-import { placeTemp, type PlacedAgent } from './layout';
-import type { AgentRuntime, AgentStatus, BubbleKind, Dialog, RequestSummary, SessionCost, TokenUsage } from './types';
+import type { AgentRuntime, AgentStatus, BubbleKind, Dialog, Move, RequestSummary, SessionCost, TokenUsage } from './types';
 import { addUsage, emptyUsage, usageOfMessage } from './usage';
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- les transcripts sont du JSON non typé */
@@ -14,13 +13,14 @@ export interface AgentDirectory {
   mainId(): string;
   has(id: string): boolean;
   nameOf(id: string): string | undefined;
+  /** Type d'un subagent d'une autre session (relance d'un agent lancé avant une interruption). */
+  agentTypeOfFile?(fileAgentId: string): string | undefined;
 }
 
 export interface TrackerEvents {
   onChange(): void;
-  onDelegate(from: string, to: string, label: string): void;
-  /** Un agent a fini sa tâche : il va porter son rapport à l'agent principal. */
-  onReport(from: string, to: string): void;
+  /** Nouveau déplacement : délégation, relance ou rapport à l'agent principal. */
+  onMove(move: Move): void;
 }
 
 export interface SubagentMeta {
@@ -34,6 +34,8 @@ interface Task {
   active: boolean;
   /** Demande pendant laquelle la tâche a été confiée : sa consommation lui est imputée. */
   requestId: string;
+  /** Rapports déjà rendus (une tâche relancée en rend un nouveau à chaque fin). */
+  reports: number;
 }
 
 interface CountedMessage {
@@ -48,16 +50,23 @@ const STALE_MS = 15 * 60_000;
 const DORMANT_AFTER_REPLAY_MS = 90_000;
 const HISTORY_SIZE = 40;
 const FILES_SIZE = 12;
+const MOVES_SIZE = 40;
 
 export class SessionTracker {
   readonly runtimes = new Map<string, AgentRuntime>();
-  readonly temps: PlacedAgent[] = [];
+  /** Intérimaires (agents intégrés non définis dans le projet), dans leur ordre d'arrivée. */
+  readonly temps: { id: string; name: string }[] = [];
   title?: string;
   dialog?: Dialog;
   /** Demandes de la session, dans l'ordre chronologique. */
   readonly requests: RequestSummary[] = [];
   sessionCost?: SessionCost;
-  /** Pendant la relecture initiale : pas d'animation de délégation. */
+  /** Derniers déplacements ; la scène joue ceux qu'elle n'a pas encore montrés. */
+  readonly moves: Move[] = [];
+  /**
+   * Pendant la relecture d'une session, les mouvements gardent l'heure du transcript (la scène ignore
+   * les anciens) ; en direct, ils prennent l'heure de lecture, même si le fichier a été écrit en retard.
+   */
   replaying = false;
 
   private readonly tasks = new Map<string, Task>();
@@ -222,7 +231,7 @@ export class SessionTracker {
       const label: string = input.description || 'Nouvelle tâche';
       this.apply(agentId, at, 'delegating', `Délègue à ${this.nameOf(target)} : ${label}`, 'say');
       this.startTask(block.id, target, label, at);
-      if (!this.replaying) this.events.onDelegate(agentId, target, label);
+      this.move(`d:${block.id}`, 'delegate', agentId, target, at);
       return;
     }
     if (name === 'SendMessage' && typeof input.to === 'string') {
@@ -235,7 +244,16 @@ export class SessionTracker {
           this.runtimeOf(task.agentId).activeTasks++;
         }
         this.apply(task.agentId, at, 'thinking', 'Reprend sa tâche', 'think');
-        if (!this.replaying) this.events.onDelegate(agentId, task.agentId, 'Relance');
+        this.move(`s:${block.id}`, 'delegate', agentId, task.agentId, at);
+        return;
+      }
+      // Agent lancé dans une autre session (avant une interruption) : retrouvé par son type.
+      const type = this.directory.agentTypeOfFile?.(input.to);
+      if (type) {
+        const target = this.resolveAgentType(type);
+        this.apply(agentId, at, 'delegating', `Relance ${this.nameOf(target)}`, 'say');
+        this.apply(target, at, 'thinking', 'Reprend sa tâche', 'think');
+        this.move(`s:${block.id}`, 'delegate', agentId, target, at);
         return;
       }
     }
@@ -251,7 +269,7 @@ export class SessionTracker {
 
   private startTask(toolUseId: string, agentId: string, label: string | undefined, at: number): void {
     if (this.tasks.has(toolUseId)) return;
-    this.tasks.set(toolUseId, { agentId, active: true, requestId: this.currentRequest(at).id });
+    this.tasks.set(toolUseId, { agentId, active: true, requestId: this.currentRequest(at).id, reports: 0 });
     const runtime = this.runtimeOf(agentId);
     runtime.activeTasks++;
     runtime.task = label;
@@ -265,14 +283,23 @@ export class SessionTracker {
     const runtime = this.runtimeOf(task.agentId);
     runtime.activeTasks = Math.max(0, runtime.activeTasks - 1);
     if (runtime.activeTasks === 0) this.apply(task.agentId, at, 'done', 'Tâche terminée', 'action');
-    if (!this.replaying && task.agentId !== this.main) this.events.onReport(task.agentId, this.main);
+    if (task.agentId !== this.main) this.move(`r:${toolUseId}:${++task.reports}`, 'report', task.agentId, this.main, at);
+  }
+
+  /** Enregistre un déplacement (une seule fois par identifiant). */
+  private move(id: string, kind: Move['kind'], from: string, to: string, recordAt: number): void {
+    if (from === to || this.moves.some((m) => m.id === id)) return;
+    const move: Move = { id, kind, from, to, at: this.replaying ? recordAt : Date.now() };
+    this.moves.push(move);
+    if (this.moves.length > MOVES_SIZE) this.moves.splice(0, this.moves.length - MOVES_SIZE);
+    this.events.onMove(move);
   }
 
   private resolveAgentType(type: string): string {
     const id = normalizeId(type);
     if (this.directory.has(id)) return id;
     const tempId = `interim-${id}`;
-    if (!this.temps.some((t) => t.id === tempId)) this.temps.push(placeTemp(tempId, type, this.temps.length));
+    if (!this.temps.some((t) => t.id === tempId)) this.temps.push({ id: tempId, name: type });
     return tempId;
   }
 

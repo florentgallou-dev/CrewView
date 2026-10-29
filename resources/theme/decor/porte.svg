@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-3 -33 68 103" width="68" height="103">
+  <!-- Porte de l'espace intérim, à plat sur le mur de gauche (1,2 × 2,15 tuiles). Ancre (0,0) : coin haut de la porte côté salle. -->
+  <rect x="0" y="0" width="42.93" height="68.8" fill="#c3c8ce"/>
+  <rect x="2.86" y="2.56" width="37.21" height="66.24" fill="#8f969e"/>
+  <text x="-1.79" y="-19.2" font-family="'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="700" fill="#16181b">INTÉRIM</text>
+</svg>

@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 46 32" width="46" height="32">
+  <!-- Tâche terminée. Étiré sur toute la dalle de l'écran. currentColor = couleur du statut. -->
+  <rect x="0" y="0" width="46" height="32" fill="#15191e"/>
+  <polyline points="15,16 21,22 32,10" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-10 -1 30 43" width="30" height="43">
+  <!-- Buste de face (40 px de haut à l'arrêt, compressé en hauteur pendant la marche). Ancre (0,0) : milieu des épaules. currentColor = couleur de l'agent (badge). -->
+  <path d="M-9 9Q-9 0 0 0Q9 0 9 9L7 40H-7Z" fill="#16181b"/>
+  <rect x="2" y="9" width="4.5" height="6" rx="1.2" fill="currentColor"/>
+</svg>

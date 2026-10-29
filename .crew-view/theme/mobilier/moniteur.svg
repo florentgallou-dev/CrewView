@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-4 -19 23 27" width="23" height="27">
+  <!-- Écran posé sur le bureau. Ancre (0,0) : coin arrière du pied d'écran, sur le plateau. La dalle (contenu ecrans/*.svg) est dessinée par-dessus, sur la face avant. -->
+  <polygon points="3.84,5.12 6.4,6.4 6.4,1.92 3.84,0.64" fill="#34393f"/>
+  <polygon points="8.96,5.12 6.4,6.4 6.4,1.92 8.96,0.64" fill="#2d3137"/>
+  <polygon points="6.4,-0.64 8.96,0.64 6.4,1.92 3.84,0.64" fill="#4a4e55"/>
+  <polygon points="-2.56,-3.2 14.08,5.12 14.08,-7.04 -2.56,-15.36" fill="#2b2f36"/>
+  <polygon points="16.64,3.84 14.08,5.12 14.08,-7.04 16.64,-8.32" fill="#22252b"/>
+  <polygon points="0,-16.64 16.64,-8.32 14.08,-7.04 -2.56,-15.36" fill="#4a4f57"/>
+</svg>

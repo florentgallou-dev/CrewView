@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-3 -3 9 9" width="9" height="9">
+  <!-- Articulation arrondie (épaule, coude, main, hanche, pied), posée sur chaque extrémité des membres. Ancre (0,0) : centre. -->
+  <circle r="2.2" fill="#16181b"/>
+</svg>

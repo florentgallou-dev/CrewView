@@ -59,13 +59,23 @@ test('découverte : dossier cité dans AGENTS.md via un glob', () => {
   assert.deepEqual(discoverAgents(root).map((a) => a.id), ['frontend-builder']);
 });
 
+test('découverte : un document sans frontmatter d’agent n’est pas un agent', () => {
+  const root = makeProject({
+    'AGENTS.md': 'Voir [l’organisation agentique](docs/13-organisation-agentique.md).',
+    'docs/13-organisation-agentique.md': '# Organisation agentique\n\nTexte.',
+    '.claude/agents/devops.md': '---\nname: devops\ndescription: "Docker et CI"\n---\nCorps',
+    '.claude/agents/notes.md': '---\ntitle: brouillon\n---\nPas un agent',
+  });
+  assert.deepEqual(discoverAgents(root).map((a) => a.id), ['devops']);
+});
+
 test('placement : l’orchestrateur prend le grand bureau, la configuration est appliquée', () => {
   const root = makeProject({
     '.github/agents/orchestrateur.agent.md': COPILOT_ORCHESTRATOR,
     '.github/agents/explorateur.agent.md': COPILOT_EXPLORER,
     '.github/agents/front.agent.md': COPILOT_FRONT,
   });
-  const placed = placeAgents(discoverAgents(root), {
+  const { agents: placed } = placeAgents(discoverAgents(root), {
     agents: { 'Frontend & Builder': { color: '#123456', desk: [2, 8] }, explorateur: { hidden: true } },
   });
   assert.equal(placed[0].id, 'orchestrateur');
@@ -77,8 +87,24 @@ test('placement : l’orchestrateur prend le grand bureau, la configuration est 
 });
 
 test('placement : sans orchestrateur défini, la session principale reste représentée', () => {
-  const placed = placeAgents([], {});
+  const { agents: placed } = placeAgents([], {});
   assert.equal(placed.length, 1);
   assert.equal(placed[0].id, 'main');
   assert.equal(placed[0].isMain, true);
+});
+
+test('placement : 16 agents, chacun son bureau, salle agrandie et couloirs entre les colonnes', () => {
+  const files: Record<string, string> = { '.github/agents/orchestrateur.agent.md': COPILOT_ORCHESTRATOR };
+  for (let i = 1; i <= 15; i++) files[`.claude/agents/agent-${i}.md`] = `---\nname: agent-${i}\ndescription: "Agent ${i}"\n---\nCorps`;
+  const { agents, room, slots } = placeAgents(discoverAgents(makeProject(files)), {});
+  assert.equal(agents.length, 16);
+  const desks = agents.map((a) => `${a.desk.x},${a.desk.y}`);
+  assert.equal(new Set(desks).size, 16, 'aucun bureau partagé');
+  assert.equal(slots.length, 15, '5 colonnes × 3 rangées');
+  assert.ok(room.width > 14 && room.depth > 12.1, 'la salle grandit');
+  assert.equal(room.aisles.length, 6, 'un couloir de chaque côté et entre chaque colonne');
+  for (const agent of agents) {
+    assert.ok(agent.desk.x + agent.desk.w < room.width && agent.desk.y + agent.desk.d < room.depth, `${agent.id} dans la salle`);
+    assert.ok(agent.spot[1] > agent.desk.y + agent.desk.d, `${agent.id} devant son bureau`);
+  }
 });

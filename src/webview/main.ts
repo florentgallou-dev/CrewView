@@ -2,18 +2,24 @@
 // Dans VS Code, la sélection est partagée avec la barre latérale (qui affiche la fiche de l'agent) ;
 // dans le navigateur, la fiche s'affiche dans un panneau flottant.
 
-import type { AgentStatus, ClientMessage, HostMessage, SceneAgent, SceneState } from '../types';
+import type { AgentStatus, ClientMessage, HostMessage, Move, RoomLayout, SceneAgent, SceneState } from '../types';
 import { renderAgentDetail } from './detail';
 import { el, fill } from './dom';
 import { drawFigure, FIGURE_HEIGHT, poseFor } from './figure';
 import { iso, type Point } from './iso';
-import { decorDrawables, deskDepth, DOOR, drawDesk, drawDeskFloor, drawNameplate, drawRoom, type Drawable, ROOM } from './room';
+import { decorDrawables, deskDepth, doorOf, drawDesk, drawDeskFloor, drawNameplate, drawRoom, type Drawable, WALL_HEIGHT } from './room';
+import { setTheme } from './sprites';
 import { BUBBLE_TTL_MS, STATUS_COLORS, STATUS_LABELS } from './status';
-import { addStop, startArrival, startDelivery, stepWalker, visitorSpot, type Vec2, type Walker } from './walk';
+import { addStop, type FloorPlan, isHeadingTo, startArrival, startDelivery, stepWalker, visitorSpot, type Vec2, type Walker } from './walk';
 
 declare function acquireVsCodeApi(): { postMessage(message: ClientMessage): void };
 
 const DIALOG_TTL_MS = 60_000;
+/** Un déplacement constaté il y a plus longtemps n'est plus joué (rechargement de la vue, relecture). */
+const MOVE_TTL_MS = 45_000;
+/** Halte d'un agent venu rendre son rapport : si l'agent principal délègue pendant ce temps, il emporte le dossier. */
+const REPORT_PAUSE_S = 3;
+const DEFAULT_ROOM: RoomLayout = { width: 14, depth: 12.1, aisles: [0.7, 3.8, 7, 10.2, 13.3] };
 const IN_VSCODE = document.body.dataset.transport === 'vscode';
 
 // ---- Éléments de la page ----------------------------------------------------------------
@@ -29,6 +35,7 @@ const dialogEl = document.getElementById('dialog')!;
 const dialogSpeakerEl = document.getElementById('dialog-speaker')!;
 const dialogTextEl = document.getElementById('dialog-text')!;
 const panelEl = document.getElementById('panel')!;
+const recenterEl = document.getElementById('recenter') as HTMLButtonElement;
 
 // ---- État ----------------------------------------------------------------------------------
 
@@ -40,7 +47,11 @@ const bubbles = new Map<string, HTMLDivElement>();
 const seenAgents = new Set<string>();
 const seeds = new Map<string, number>();
 const statusSince = new Map<string, { status: AgentStatus; at: number }>();
+const playedMoves = new Set<string>();
 let camera = { scale: 1, ox: 0, oy: 0 };
+/** Zoom et déplacement choisis par l'utilisateur, appliqués par-dessus le cadrage automatique. */
+const view = { zoom: 1, panX: 0, panY: 0 };
+let fit = { scale: 1, ox: 0, oy: 0 };
 
 // ---- Transport -------------------------------------------------------------------------------
 
@@ -74,36 +85,72 @@ function onMessage(message: HostMessage): void {
       if (!seeds.has(agent.id)) seeds.set(agent.id, Math.random() * 10);
       // Un intérimaire qui apparaît en direct entre par la porte.
       if (!first && agent.temp && !seenAgents.has(agent.id)) {
-        walkers.set(agent.id, startArrival([0.35, DOOR.y + DOOR.width / 2], agent.spot, desks()));
+        const door = doorOf(room());
+        walkers.set(agent.id, startArrival([0.35, door.y + door.width / 2], agent.spot, plan()));
       }
       seenAgents.add(agent.id);
       const since = statusSince.get(agent.id);
       if (!since || since.status !== agent.runtime.status) statusSince.set(agent.id, { status: agent.runtime.status, at: performance.now() });
     }
+    playMoves(state.moves);
     renderHeader();
     renderDialog();
     if (selectedId) renderPanel();
-  } else if (message.type === 'delegate' || message.type === 'report') {
-    // Délégation : l'orchestrateur apporte le dossier ; rapport : l'agent rapporte le sien.
-    deliver(message.from, message.to);
   } else if (message.type === 'selection') {
     selectedId = message.agentId;
     renderDialog();
+  } else if (message.type === 'theme') {
+    setTheme(message.layers);
   }
 }
 
-function deliver(fromId: string, toId: string): void {
+/**
+ * Joue les déplacements pas encore montrés. Ils viennent de l'état (et non d'événements éphémères) :
+ * rien n'est perdu si la vue était fermée, rechargée ou reconnectée.
+ */
+function playMoves(moves: Move[]): void {
+  for (const move of moves) {
+    if (playedMoves.has(move.id)) continue;
+    playedMoves.add(move.id);
+    if (Date.now() - move.at > MOVE_TTL_MS) continue;
+    if (move.kind === 'report') {
+      deliver(move.from, move.to, REPORT_PAUSE_S);
+    } else if (!relay(move)) {
+      deliver(move.from, move.to);
+    }
+  }
+}
+
+/**
+ * Passage de relais : si un agent est en route (ou en halte) vers l'agent principal pour rendre son rapport
+ * au moment où celui-ci délègue, c'est lui qui emporte le dossier jusqu'au suivant.
+ */
+function relay(move: Move): boolean {
+  const to = agentById(move.to);
+  if (!to) return false;
+  for (const [agentId, walker] of walkers) {
+    if (agentId === move.to || agentId === move.from || !isHeadingTo(walker, move.from)) continue;
+    // Le rapport est remis, puis l'agent repart directement vers le suivant.
+    walker.stops.splice(1, 0, { to: move.to, target: visitorSpot(to.desk) });
+    if (walker.phase === 'pause') walker.pauseLeft = Math.min(walker.pauseLeft, 1);
+    return true;
+  }
+  return false;
+}
+
+function deliver(fromId: string, toId: string, pause?: number): void {
   const from = agentById(fromId);
   const to = agentById(toId);
   if (!from || !to || from === to) return;
-  const stop = { to: toId, target: visitorSpot(to.desk) };
+  const stop = { to: toId, target: visitorSpot(to.desk), pause };
   const walker = walkers.get(fromId);
-  if (walker) addStop(walker, stop, desks());
-  else walkers.set(fromId, startDelivery(from.spot, stop, desks()));
+  if (walker) addStop(walker, stop, plan());
+  else walkers.set(fromId, startDelivery(from.spot, stop, plan()));
 }
 
 const agentById = (id: string) => state?.agents.find((a) => a.id === id);
-const desks = () => state?.agents.map((a) => a.desk) ?? [];
+const room = (): RoomLayout => state?.room ?? DEFAULT_ROOM;
+const plan = (): FloorPlan => ({ desks: state?.agents.map((a) => a.desk) ?? [], aisles: room().aisles });
 
 // ---- Rendu ----------------------------------------------------------------------------------
 
@@ -121,7 +168,7 @@ function frame(now: number): void {
       walkers.delete(id);
       continue;
     }
-    if (stepWalker(walker, dt, agent.spot, desks()) === 'done') walkers.delete(id);
+    if (stepWalker(walker, dt, agent.spot, plan()) === 'done') walkers.delete(id);
   }
 
   const dpr = window.devicePixelRatio || 1;
@@ -129,11 +176,12 @@ function frame(now: number): void {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.setTransform(dpr * camera.scale, 0, 0, dpr * camera.scale, dpr * camera.ox, dpr * camera.oy);
 
-  drawRoom(ctx, state?.project ?? '');
   const agents = state?.agents ?? [];
+  const boss = agents.find((a) => a.isMain);
+  drawRoom(ctx, state?.project ?? '', room(), boss?.desk.x ?? room().width / 2 - 1.2);
   for (const agent of agents) drawDeskFloor(ctx, agent, agent.id === selectedId);
 
-  const drawables: Drawable[] = [...decorDrawables()];
+  const drawables: Drawable[] = [...decorDrawables(room())];
   for (const agent of agents) {
     drawables.push({ depth: deskDepth(agent), draw: (c, time) => drawDesk(c, agent, time) });
     const position = positionOf(agent);
@@ -163,13 +211,15 @@ function drawAgent(c: CanvasRenderingContext2D, agent: SceneAgent, position: Vec
     pose.headDx = walker.facing * 1.2;
     pose.headDy = 0;
   } else if (walker) {
+    // Halte chez un collègue : face à lui, de dos pour nous.
     pose.arms = 'gesture';
+    pose.back = true;
   }
   const ring = agent.id === selectedId ? agent.color : status !== 'idle' ? STATUS_COLORS[status] : undefined;
   drawFigure(c, iso(position[0], position[1]), pose, agent.color, t, ring);
 }
 
-/** Ajuste la caméra pour que la salle tienne dans la fenêtre. */
+/** Cadrage automatique de toute la salle, puis zoom et déplacement de l'utilisateur. */
 function resize(): void {
   const dpr = window.devicePixelRatio || 1;
   const width = canvas.clientWidth;
@@ -178,19 +228,45 @@ function resize(): void {
     canvas.width = Math.round(width * dpr);
     canvas.height = Math.round(height * dpr);
   }
-  const minX = iso(0, ROOM.depth).x - 10;
-  const maxX = iso(ROOM.width, 0).x + 10;
-  const minY = iso(0, 0, ROOM.height).y - 10;
-  const maxY = iso(ROOM.width, ROOM.depth).y + 24;
+  const { width: W, depth: D } = room();
+  const minX = iso(0, D).x - 10;
+  const maxX = iso(W, 0).x + 10;
+  const minY = iso(0, 0, WALL_HEIGHT).y - 10;
+  const maxY = iso(W, D).y + 24;
   // Marges fixes : la barre de dialogue flotte au-dessus de la scène sans la recadrer.
   const top = 52;
   const bottom = 24;
   const scale = Math.min((width - 24) / (maxX - minX), (height - top - bottom) / (maxY - minY), 2.4);
-  camera = {
+  fit = {
     scale,
     ox: (width - (maxX - minX) * scale) / 2 - minX * scale,
     oy: top + (height - top - bottom - (maxY - minY) * scale) / 2 - minY * scale,
   };
+  camera = { scale: fit.scale * view.zoom, ox: fit.ox * view.zoom + view.panX, oy: fit.oy * view.zoom + view.panY };
+}
+
+/** Zoom à la molette, centré sur le pointeur (de 0,8 × à 5 × le cadrage complet). */
+function zoomAt(clientX: number, clientY: number, factor: number): void {
+  const zoom = Math.min(5, Math.max(0.8, view.zoom * factor));
+  const ratio = zoom / view.zoom;
+  // Le point de la salle sous le pointeur reste sous le pointeur.
+  const ox = clientX - (clientX - camera.ox) * ratio;
+  const oy = clientY - (clientY - camera.oy) * ratio;
+  view.zoom = zoom;
+  view.panX = ox - fit.ox * zoom;
+  view.panY = oy - fit.oy * zoom;
+  updateRecenter();
+}
+
+function recenter(): void {
+  view.zoom = 1;
+  view.panX = 0;
+  view.panY = 0;
+  updateRecenter();
+}
+
+function updateRecenter(): void {
+  recenterEl.hidden = Math.abs(view.zoom - 1) < 0.01 && Math.abs(view.panX) < 1 && Math.abs(view.panY) < 1;
 }
 
 function toScreen(p: Point): Point {
@@ -345,10 +421,42 @@ function agentAt(clientX: number, clientY: number): SceneAgent | undefined {
   return undefined;
 }
 
-canvas.addEventListener('click', (event) => select(agentAt(event.clientX, event.clientY)?.id));
-canvas.addEventListener('mousemove', (event) => {
-  canvas.style.cursor = agentAt(event.clientX, event.clientY) ? 'pointer' : 'default';
+// Glisser pour se déplacer dans la salle ; un clic sans glisser sélectionne un agent.
+let drag: { x: number; y: number; moved: boolean } | undefined;
+canvas.addEventListener('mousedown', (event) => {
+  if (event.button === 0) drag = { x: event.clientX, y: event.clientY, moved: false };
 });
+window.addEventListener('mousemove', (event) => {
+  if (drag && (event.buttons & 1)) {
+    const dx = event.clientX - drag.x;
+    const dy = event.clientY - drag.y;
+    if (drag.moved || Math.hypot(dx, dy) > 4) {
+      drag.moved = true;
+      view.panX += dx;
+      view.panY += dy;
+      drag.x = event.clientX;
+      drag.y = event.clientY;
+      updateRecenter();
+    }
+  }
+  if (event.target === canvas) {
+    canvas.style.cursor = drag?.moved ? 'grabbing' : agentAt(event.clientX, event.clientY) ? 'pointer' : 'grab';
+  }
+});
+window.addEventListener('mouseup', () => {
+  setTimeout(() => (drag = undefined), 0);
+});
+canvas.addEventListener('click', (event) => {
+  if (!drag?.moved) select(agentAt(event.clientX, event.clientY)?.id);
+});
+canvas.addEventListener('wheel', (event) => {
+  event.preventDefault();
+  zoomAt(event.clientX, event.clientY, Math.exp(-event.deltaY * 0.0015));
+}, { passive: false });
+canvas.addEventListener('dblclick', (event) => {
+  if (!agentAt(event.clientX, event.clientY)) recenter();
+});
+recenterEl.addEventListener('click', recenter);
 window.addEventListener('keydown', (event) => {
   if (event.key === 'Escape') select(undefined);
 });

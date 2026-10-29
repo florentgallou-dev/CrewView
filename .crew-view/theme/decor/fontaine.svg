@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-18 -45 36 63" width="36" height="63">
+  <!-- Fontaine à eau. Ancre (0,0) : coin arrière au sol (les bulles sont animées par l'extension). -->
+  <polygon points="-16,8 0,16 0,-14.4 -16,-22.4" fill="#d6d8da" stroke="rgba(0,0,0,0.1)" stroke-width="0.75"/>
+  <polygon points="16,8 0,16 0,-14.4 16,-22.4" fill="#babbbd" stroke="rgba(0,0,0,0.1)" stroke-width="0.75"/>
+  <polygon points="0,-30.4 16,-22.4 0,-14.4 -16,-22.4" fill="#eff1f3" stroke="rgba(0,0,0,0.1)" stroke-width="0.75"/>
+  <ellipse cx="0" cy="-31.04" rx="9" ry="12" fill="rgba(88,153,218,0.75)"/>
+</svg>

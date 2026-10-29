@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-10 -12 20 18" width="20" height="18">
+  <!-- Pile de livres. Ancre (0,0) : point du plateau où l'accessoire est posé. currentColor = couleur de l'agent. -->
+  <polygon points="-8,-0.8 1.6,4 1.6,2.08 -8,-2.72" fill="#4f8ac4"/>
+  <polygon points="8,0.8 1.6,4 1.6,2.08 8,-1.12" fill="#4577aa"/>
+  <polygon points="-1.6,-5.92 8,-1.12 1.6,2.08 -8,-2.72" fill="#65a1dd"/>
+  <polygon points="-8,-2.72 1.6,2.08 1.6,0.16 -8,-4.64" fill="#d16835"/>
+  <polygon points="8,-1.12 1.6,2.08 1.6,0.16 8,-3.04" fill="#b55a2e"/>
+  <polygon points="-1.6,-7.84 8,-3.04 1.6,0.16 -8,-4.64" fill="#ea7f4b"/>
+  <polygon points="-8,-4.64 1.6,0.16 1.6,-1.76 -8,-6.56" fill="#17986d"/>
+  <polygon points="8,-3.04 1.6,0.16 1.6,-1.76 8,-4.96" fill="#14845e"/>
+  <polygon points="-1.6,-9.76 8,-4.96 1.6,-1.76 -8,-6.56" fill="#2bb084"/>
+</svg>

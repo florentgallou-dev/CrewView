@@ -5,11 +5,11 @@ import { SessionTracker } from '../src/tracker';
 const KNOWN: Record<string, string> = { orchestrateur: 'Orchestrateur', explorateur: 'Explorateur' };
 
 function setup() {
-  const delegations: [string, string, string][] = [];
+  const delegations: [string, string][] = [];
   const reports: [string, string][] = [];
   const tracker = new SessionTracker(
     { mainId: () => 'orchestrateur', has: (id) => id in KNOWN, nameOf: (id) => KNOWN[id] },
-    { onChange: () => undefined, onDelegate: (from, to, label) => delegations.push([from, to, label]), onReport: (from, to) => reports.push([from, to]) },
+    { onChange: () => undefined, onMove: (m) => (m.kind === 'delegate' ? delegations.push([m.from, m.to]) : reports.push([m.from, m.to])) },
   );
   return { tracker, delegations, reports, status: (id: string) => tracker.runtimeOf(id).status };
 }
@@ -31,7 +31,7 @@ test('délégation à un agent du projet : animation, tâche, puis fin via la no
   const { tracker, delegations, reports, status } = setup();
   tracker.handleMain(assistant([{ type: 'tool_use', id: 't1', name: 'Agent', input: { subagent_type: 'Explorateur', description: 'Analyser' } }]));
   tracker.handleMain({ type: 'user', timestamp: at(), message: { content: [{ type: 'tool_result', tool_use_id: 't1' }] }, toolUseResult: { isAsync: true, status: 'async_launched' } });
-  assert.deepEqual(delegations, [['orchestrateur', 'explorateur', 'Analyser']]);
+  assert.deepEqual(delegations, [['orchestrateur', 'explorateur']]);
   assert.equal(status('explorateur'), 'thinking', 'une tâche asynchrone lancée n’est pas terminée');
 
   tracker.registerSubagent('a1', { agentType: 'Explorateur', toolUseId: 't1' });
@@ -53,7 +53,7 @@ test('un type d’agent inconnu devient un intérimaire', () => {
   tracker.handleMain(assistant([{ type: 'tool_use', id: 't2', name: 'Agent', input: { subagent_type: 'Explore', description: 'Inventaire' } }]));
   assert.equal(tracker.temps.length, 1);
   assert.equal(tracker.temps[0].id, 'interim-explore');
-  assert.equal(tracker.temps[0].temp, true);
+  assert.equal(tracker.temps[0].name, 'Explore');
   assert.equal(delegations[0][1], 'interim-explore');
 });
 
@@ -123,4 +123,27 @@ test('après relecture, une session ancienne est au repos', () => {
   tracker.handleMain({ ...assistant([{ type: 'tool_use', id: 'b', name: 'Bash', input: {} }]), timestamp: '2020-01-01T00:00:00Z' });
   tracker.settle(Date.now());
   assert.equal(status('orchestrateur'), 'idle');
+});
+
+test('déplacements mémorisés : identifiants uniques, heure de lecture en direct, heure du transcript en relecture', () => {
+  const { tracker } = setup();
+  tracker.replaying = true;
+  tracker.handleMain({ ...assistant([{ type: 'tool_use', id: 'old', name: 'Agent', input: { subagent_type: 'explorateur', description: 'Ancien' } }]), timestamp: '2020-01-01T00:00:00Z' });
+  tracker.replaying = false;
+  tracker.handleMain(assistant([{ type: 'tool_use', id: 'new', name: 'Agent', input: { subagent_type: 'explorateur', description: 'Nouveau' } }]));
+  tracker.handleMain(assistant([{ type: 'tool_use', id: 'new', name: 'Agent', input: { subagent_type: 'explorateur', description: 'Doublon' } }]));
+  assert.deepEqual(tracker.moves.map((m) => m.id), ['d:old', 'd:new']);
+  assert.equal(tracker.moves[0].at, Date.parse('2020-01-01T00:00:00Z'));
+  assert.ok(Date.now() - tracker.moves[1].at < 1000, 'en direct : heure de lecture');
+});
+
+test('relance d’un agent d’une session précédente : retrouvé par son type', () => {
+  const moves: string[] = [];
+  const tracker = new SessionTracker(
+    { mainId: () => 'orchestrateur', has: (id) => id in KNOWN, nameOf: (id) => KNOWN[id], agentTypeOfFile: (id) => (id === 'ancien' ? 'Explorateur' : undefined) },
+    { onChange: () => undefined, onMove: (m) => moves.push(`${m.kind}:${m.from}>${m.to}`) },
+  );
+  tracker.handleMain(assistant([{ type: 'tool_use', id: 'sm', name: 'SendMessage', input: { to: 'ancien', message: 'Reprends' } }]));
+  assert.deepEqual(moves, ['delegate:orchestrateur>explorateur']);
+  assert.equal(tracker.runtimeOf('explorateur').status, 'thinking');
 });

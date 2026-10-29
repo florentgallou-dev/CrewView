@@ -48,7 +48,7 @@ L'icône **Crew** de la barre d'activité (colonne de gauche) ouvre trois vues :
 - **Paramètres** :
   - pour le projet : orchestrateur et dossiers d'agents supplémentaires ;
   - pour chaque agent, intérimaires compris : nom affiché, couleur, accessoire, poste et masquage. Choisir un poste déjà occupé échange les deux agents ;
-  - pour VS Code : port du navigateur et dossier Claude.
+  - pour VS Code : port du navigateur, dossier Claude et dossier de graphismes commun.
 
   Les réglages du projet sont écrits dans `.crew-view/config.json` et appliqués à chaud.
 
@@ -60,6 +60,8 @@ En mode navigateur, sans barre latérale, la fiche s'affiche dans un panneau flo
 npm install && npm run build
 node dist/cli.js /chemin/du/projet            # ouvre le navigateur
 node dist/cli.js . --port 4800 --no-open
+node dist/cli.js . --verbose                 # journal de diagnostic dans la console
+node dist/cli.js . --theme-dir ~/mes-graphismes   # dossier de graphismes commun
 ```
 
 ## Où sont cherchés les agents
@@ -100,8 +102,25 @@ Les fichiers Copilot restent la source : modifiez-les puis régénérez.
 
 - Les clés de `agents` sont les identifiants (nom normalisé : `Frontend & Builder` → `frontend-builder`) ou les noms tels quels. Les intérimaires ont pour clé `interim-<type>` (par ex. `interim-explore`) ; on peut régler leur `label`, leur `color` et `hidden`.
 - Accessoires : `plant`, `lamp`, `mug`, `books`, `server`, `magnifier`, `trophy`, `shield`, `none`.
-- `desk` est le coin arrière-gauche du bureau, en tuiles, dans une salle de 14 × 11. Les emplacements par défaut sont deux rangées de quatre bureaux (y = 3.8 et 6.6 ; x = 1.4, 4.6, 7.8, 11), puis deux postes à l'avant gauche. L'avant droit est réservé à l'intérim.
+- `desk` est le coin arrière-gauche du bureau, en tuiles. Par défaut, la salle s'agrandit avec le nombre d'agents. La grille compte 4 colonnes jusqu'à 8 agents, 5 jusqu'à 15 et 6 au-delà (x = 1.4 + 3.2 × colonne ; y = 3.8 + 2.8 × rangée), avec des couloirs entre les colonnes. La table des intérimaires est placée après la dernière rangée. Un poste personnalisé hors de la grille agrandit la salle d'autant.
 - Les modifications sont prises en compte à chaud (toutes les 3 s).
+
+## Graphismes personnalisables
+
+Chaque élément de l'open-space est un fichier SVG de `resources/theme/` :
+- **mobilier :** bureaux, écran, portable ;
+- **décor :** sol, murs, porte, enseigne, cadre, horloge, armoire, fontaine, plante ;
+- **accessoires ;**
+- **fonds d'écran** selon le statut ;
+- **personnage :** pièces animées (tête, buste de face et de dos, bras, avant-bras, jambe, articulation, dossier) et `pivots.json`.
+
+Pour remplacer un élément, enregistre un SVG au même chemin :
+1. dans `.crew-view/theme/` du projet (prioritaire, à commiter) ;
+2. ou dans le dossier du réglage `crewView.themeDir` (CLI : `--theme-dir`), commun à tous les projets.
+
+Les fichiers absents ou illisibles sont pris au niveau suivant, et la scène se met à jour à l'enregistrement. La commande **Personnaliser les graphismes du projet** (bouton pinceau des Paramètres) copie le thème par défaut dans le projet pour servir de point de départ.
+
+Les conventions (échelle, point d'ancrage, perspective isométrique, `currentColor` = couleur de l'agent) et l'ancrage de chaque fichier sont décrits dans `resources/theme/README.md`.
 
 ## Ce qui est représenté
 
@@ -112,9 +131,18 @@ Les fichiers Copilot restent la source : modifiez-les puis régénérez.
 | Écrit | Edit, Write, NotebookEdit | tape au clavier |
 | Exécute | Bash, outils MCP | tape, écran qui pulse, baie serveur qui clignote |
 | Délègue | outil Agent / SendMessage | marche jusqu'au bureau cible avec un dossier |
+| Rapporte | fin de tâche d'un subagent | va porter son dossier au bureau de l'agent principal |
 | Parle | texte de réponse | geste de la main, bulle blanche |
 | Attend votre réponse | AskUserQuestion, ExitPlanMode | main levée, bulle rouge |
 | Terminé | fin de tour / notification de fin de tâche | s'étire, puis repos après 6 s |
+
+Pendant le travail (réflexion, lecture, écriture, exécution), l'agent est **de dos, face à son écran**, qui affiche son activité : page qui défile, code qui s'écrit, terminal, points de réflexion. Au repos, quand il parle, attend votre réponse ou a fini, il se retourne vers vous.
+
+**Déplacements.** Chaque délégation et chaque rapport sont mémorisés pendant 45 s avec un identifiant. Une vue ouverte, rechargée ou reconnectée rejoue ceux qu'elle n'a pas encore montrés. **Passage de relais :** si l'agent principal délègue pendant qu'un agent vient lui rendre son rapport, c'est cet agent qui emporte le dossier jusqu'au suivant. Un agent relancé alors qu'il avait été lancé dans une session précédente est retrouvé par son type.
+
+**Navigation.** Molette pour zoomer, glisser pour se déplacer, double-clic dans la salle (ou bouton « Recentrer ») pour revenir au cadrage complet.
+
+**Diagnostic.** Dans VS Code, le panneau *Affichage › Sortie › Crew View* trace la session suivie, les agents trouvés, et chaque délégation et rapport. Si un agent ne bouge pas, c'est le premier endroit à regarder.
 
 Une seule session est suivie à la fois : la plus récemment active du projet. Si une nouvelle session démarre, ou si une autre devient active alors que la session suivie est silencieuse depuis 30 s, Crew View bascule sur elle.
 
@@ -158,6 +186,7 @@ F5 dans VS Code lance une fenêtre de développement avec l'extension (`.vscode/
 npm run demo                     # une demande complète (≈ 2 min 30), dans le navigateur
 npm run demo -- --loop           # enchaîne les demandes en boucle
 npm run demo -- --speed 2        # deux fois plus vite
+npm run demo -- --agents 16       # équipe de 16 agents (salle agrandie)
 npm run demo -- --port 4800 --no-open
 ```
 
@@ -170,7 +199,7 @@ Déroulé :
 4. La Revue Qualité trouve une anomalie d'accessibilité. Le Frontend est relancé pour la corriger, puis la Revue valide.
 5. L'Orchestrateur vous pose une question.
 
-Chaque agent qui termine sa tâche vient porter son rapport au bureau de l'Orchestrateur. Avec `--loop`, une seconde demande (l'export groupé) suit, puis le cycle recommence.
+Chaque agent qui termine sa tâche vient porter son rapport au bureau de l'Orchestrateur ; s'il est encore là quand l'Orchestrateur délègue la suite, c'est lui qui emporte le dossier. Avec `--loop`, une seconde demande (l'export groupé) suit, puis le cycle recommence.
 
 Structure :
 

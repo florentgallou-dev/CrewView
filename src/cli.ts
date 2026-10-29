@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Lancement hors VS Code : `crew-view [dossier-projet] [--port 4719] [--no-open]`.
+// Lancement hors VS Code : `crew-view [dossier-projet] [--port 4719] [--theme-dir dossier] [--no-open] [--verbose]`.
 
 import { spawn } from 'node:child_process';
 import * as fs from 'node:fs';
@@ -15,6 +15,7 @@ async function main(): Promise<void> {
   };
   const port = Number(option('--port') ?? 4719);
   const claudeConfigDir = option('--claude-dir');
+  const themeDir = option('--theme-dir');
   const noOpen = args.includes('--no-open');
   const root = path.resolve(args.find((a) => !a.startsWith('--')) ?? process.cwd());
 
@@ -23,7 +24,8 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  const hub = new CrewHub({ root, claudeConfigDir });
+  const verbose = args.includes('--verbose');
+  const hub = new CrewHub({ root, claudeConfigDir, themeDir, log: verbose ? (line) => console.log(`  [${new Date().toLocaleTimeString('fr-FR')}] ${line}`) : undefined });
   hub.start();
   const server = await startServer(hub, path.join(__dirname, 'media'), port);
   console.log(`Crew View — ${path.basename(root)}`);

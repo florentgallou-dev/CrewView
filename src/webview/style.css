@@ -463,3 +463,26 @@ button.link:hover {
   padding-top: 4px;
   border-top: 1px solid #eef0f2;
 }
+
+/* ---- Zoom ---- */
+
+#recenter {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+#recenter:hover {
+  background: #fff;
+}
+
+#scene {
+  cursor: grab;
+}

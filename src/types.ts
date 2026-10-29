@@ -1,5 +1,7 @@
 // Types partagés entre l'hôte (extension / CLI) et la scène (webview / navigateur).
 
+import type { ThemeLayers } from './themeFiles';
+
 export type AgentStatus =
   | 'idle'
   | 'thinking'
@@ -113,6 +115,17 @@ export interface Dialog {
   at: number;
 }
 
+/** Déplacement à jouer dans la scène : délégation (vers un agent) ou rapport (retour à l'agent principal). */
+export interface Move {
+  /** Identifiant stable : la scène ne joue chaque mouvement qu'une fois, même après un rechargement. */
+  id: string;
+  kind: 'delegate' | 'report';
+  from: string;
+  to: string;
+  /** Moment où l'extension a constaté le mouvement (heure du transcript pendant une relecture). */
+  at: number;
+}
+
 export interface SceneState {
   project: string;
   sessionId?: string;
@@ -124,6 +137,17 @@ export interface SceneState {
   /** Demandes de la session suivie, dans l'ordre chronologique. */
   requests: RequestSummary[];
   sessionCost?: SessionCost;
+  /** Derniers déplacements, du plus ancien au plus récent. */
+  moves: Move[];
+  /** Dimensions de la salle et couloirs de circulation (en tuiles). */
+  room: RoomLayout;
+}
+
+export interface RoomLayout {
+  width: number;
+  depth: number;
+  /** Abscisses des couloirs verticaux entre les colonnes de bureaux. */
+  aisles: number[];
 }
 
 // ---- Écran de paramètres (barre latérale) ----------------------------------------------------
@@ -156,6 +180,7 @@ export interface SettingsData {
   accessories: Accessory[];
   port: number;
   claudeConfigDir: string;
+  themeDir: string;
 }
 
 export interface AgentPatch {
@@ -171,17 +196,17 @@ export interface ProjectPatch {
   agentsDirs?: string[];
 }
 
-export type CrewCommand = 'crewView.open' | 'crewView.openInBrowser' | 'crewView.generateClaudeAgents' | 'crewView.initConfig';
+export type CrewCommand = 'crewView.open' | 'crewView.openInBrowser' | 'crewView.generateClaudeAgents' | 'crewView.initConfig' | 'crewView.customizeTheme';
 
 // ---- Messages ---------------------------------------------------------------------------------
 
 export type HostMessage =
   | { type: 'state'; state: SceneState }
-  | { type: 'delegate'; from: string; to: string; label: string }
-  | { type: 'report'; from: string; to: string }
   | { type: 'selection'; agentId?: string }
   | { type: 'settings'; data: SettingsData }
-  | { type: 'ui'; folds: Record<string, boolean> };
+  | { type: 'ui'; folds: Record<string, boolean> }
+  /** Fichiers du thème graphique, couche du projet en tête (voir themeFiles.ts). */
+  | { type: 'theme'; layers: ThemeLayers };
 
 export type ClientMessage =
   | { type: 'ready' }
@@ -190,6 +215,6 @@ export type ClientMessage =
   | { type: 'command'; command: CrewCommand }
   | { type: 'updateAgent'; id: string; patch: AgentPatch }
   | { type: 'updateProject'; patch: ProjectPatch }
-  | { type: 'updateSetting'; key: 'port' | 'claudeConfigDir'; value: string | number }
+  | { type: 'updateSetting'; key: 'port' | 'claudeConfigDir' | 'themeDir'; value: string | number }
   /** Sections repliées/dépliées de la fiche agent, mémorisées par l'extension. */
   | { type: 'ui'; folds: Record<string, boolean> };

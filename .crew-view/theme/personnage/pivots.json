@@ -1,0 +1,8 @@
+{
+  "_aide": "Pixels de scène (zoom 1), y vers le bas. tete, epaule (côté droit, symétrique à gauche) et dossier : relatifs au milieu des épaules ; hanche : relative au milieu du bas du buste ; longueurs : longueur dessinée de chaque membre dans son SVG. Voir README.md.",
+  "tete": [0, -9.4],
+  "epaule": [8, 6],
+  "hanche": [2.6, -2],
+  "dossier": [11, 10.5],
+  "longueurs": { "bras": 10, "avant-bras": 10, "jambe": 10 }
+}
