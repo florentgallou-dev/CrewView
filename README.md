@@ -15,10 +15,19 @@ L'observation est purement passive. Crew View lit les transcripts que Claude Cod
 
 ### Extension VS Code (recommandé)
 
+1. Télécharger le dernier `crew-view-x.y.z.vsix` depuis la page [Releases](https://github.com/florentgallou-dev/CrewView/releases) du dépôt.
+2. Dans VS Code : **Extensions › … › Installer depuis VSIX…**, choisir le fichier, puis recharger la fenêtre. En ligne de commande : `code --install-extension crew-view-x.y.z.vsix`.
+3. Pour mettre à jour, refaire la même chose avec le nouveau fichier. Une extension installée depuis un VSIX ne se met pas à jour toute seule.
+
+En WSL ou en Remote, installer l'extension **pendant que VS Code est connecté** : elle doit tourner du même côté que Claude Code pour lire ses transcripts.
+
+**Depuis les sources :**
+
 ```bash
-npm install
-npm run package          # produit crew-view-0.1.0.vsix
-code --install-extension crew-view-0.1.0.vsix
+git clone https://github.com/florentgallou-dev/CrewView && cd CrewView
+npm ci
+npm run package          # produit crew-view-x.y.z.vsix
+code --install-extension crew-view-*.vsix
 ```
 
 Elle fonctionne sous Windows natif comme en WSL (l'extension s'exécute alors côté WSL, là où tourne Claude Code). Node n'est requis que pour construire le `.vsix` : l'extension utilise le Node intégré à VS Code.
@@ -202,6 +211,19 @@ npm test           # tests unitaires (node:test)
 ```
 
 F5 dans VS Code lance une fenêtre de développement avec l'extension (`.vscode/launch.json`).
+
+### Publier une version
+
+Le workflow `.github/workflows/release.yml` publie le `.vsix` à chaque tag de version poussé :
+
+1. Changer `version` dans `package.json` (ex. `0.7.3`) et commiter.
+2. Pousser le commit, puis le tag, qui doit être `v` suivi de la version :
+   ```bash
+   git push
+   git tag v0.7.3 && git push origin v0.7.3
+   ```
+
+GitHub Actions vérifie que le tag correspond à `package.json`, lance la vérification des types et les tests, construit le `.vsix`, puis crée la release avec le fichier joint. Si la release existe déjà (créée à la main), le `.vsix` y est ajouté.
 
 ### Démo sans vraie session
 

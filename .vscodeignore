@@ -8,3 +8,4 @@ esbuild.mjs
 tsconfig.json
 **/*.map
 demo/**
+.github/**

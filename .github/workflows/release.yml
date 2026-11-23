@@ -1,0 +1,47 @@
+# Publie le .vsix de Crew View dans une Release GitHub à chaque tag de version poussé.
+#   git tag v0.7.3 && git push origin v0.7.3
+# Le tag doit correspondre à la version de package.json (v + version).
+
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Vérifier que le tag correspond à package.json
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          if [ "$GITHUB_REF_NAME" != "v$version" ]; then
+            echo "::error::Le tag $GITHUB_REF_NAME ne correspond pas à la version v$version de package.json."
+            exit 1
+          fi
+
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run package
+
+      - name: Créer la release ou y ajouter le .vsix
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          vsix="crew-view-${GITHUB_REF_NAME#v}.vsix"
+          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" "$vsix" --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" "$vsix" --title "Crew View ${GITHUB_REF_NAME#v}" --generate-notes
+          fi
