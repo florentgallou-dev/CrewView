@@ -71,6 +71,12 @@ export interface SessionCost {
   byModel: { model: string; costUsd: number; inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheWriteTokens: number; webSearches: number }[];
 }
 
+/** Tokens envoyés au modèle lors de la dernière réponse de la session principale (entrée + cache écrit + cache lu). */
+export interface ContextUsage {
+  tokens: number;
+  model: string;
+}
+
 export interface AgentRuntime {
   status: AgentStatus;
   statusAt: number;
@@ -137,6 +143,11 @@ export interface SceneState {
   /** Demandes de la session suivie, dans l'ordre chronologique. */
   requests: RequestSummary[];
   sessionCost?: SessionCost;
+  /** Remplissage du contexte de la session principale, d'après la dernière réponse du modèle. */
+  context?: ContextUsage;
+  /** Premier et dernier échange de la session suivie (ms depuis l'époque Unix). */
+  startedAt?: number;
+  lastActivityAt?: number;
   /** Derniers déplacements, du plus ancien au plus récent. */
   moves: Move[];
   /** Dimensions de la salle et couloirs de circulation (en tuiles). */
@@ -181,6 +192,7 @@ export interface SettingsData {
   port: number;
   claudeConfigDir: string;
   themeDir: string;
+  contextWindow: string;
 }
 
 export interface AgentPatch {
@@ -215,6 +227,6 @@ export type ClientMessage =
   | { type: 'command'; command: CrewCommand }
   | { type: 'updateAgent'; id: string; patch: AgentPatch }
   | { type: 'updateProject'; patch: ProjectPatch }
-  | { type: 'updateSetting'; key: 'port' | 'claudeConfigDir' | 'themeDir'; value: string | number }
+  | { type: 'updateSetting'; key: 'port' | 'claudeConfigDir' | 'themeDir' | 'contextWindow'; value: string | number }
   /** Sections repliées/dépliées de la fiche agent, mémorisées par l'extension. */
   | { type: 'ui'; folds: Record<string, boolean> };

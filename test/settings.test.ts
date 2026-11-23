@@ -22,7 +22,7 @@ function setup(config?: unknown) {
   return { root, hub, read };
 }
 
-const general = { port: 4719, claudeConfigDir: '', themeDir: '' };
+const general = { port: 4719, claudeConfigDir: '', themeDir: '', contextWindow: 'auto' };
 
 test('paramètres : agent principal en tête, postes par défaut reconnus', () => {
   const { hub } = setup();

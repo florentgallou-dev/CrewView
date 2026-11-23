@@ -7,6 +7,7 @@ import { renderAgentDetail } from './detail';
 import { el, fill } from './dom';
 import { drawFigure, FIGURE_HEIGHT, poseFor } from './figure';
 import { iso, type Point } from './iso';
+import { beaconLevel, createLegend } from './beacon';
 import { decorDrawables, deskDepth, doorOf, drawDesk, drawDeskFloor, drawNameplate, drawRoom, type Drawable, WALL_HEIGHT } from './room';
 import { setTheme } from './sprites';
 import { BUBBLE_TTL_MS, STATUS_COLORS, STATUS_LABELS } from './status';
@@ -36,6 +37,7 @@ const dialogSpeakerEl = document.getElementById('dialog-speaker')!;
 const dialogTextEl = document.getElementById('dialog-text')!;
 const panelEl = document.getElementById('panel')!;
 const recenterEl = document.getElementById('recenter') as HTMLButtonElement;
+const showBeaconLevel = createLegend(document.getElementById('legend')!);
 
 // ---- État ----------------------------------------------------------------------------------
 
@@ -178,7 +180,9 @@ function frame(now: number): void {
 
   const agents = state?.agents ?? [];
   const boss = agents.find((a) => a.isMain);
-  drawRoom(ctx, state?.project ?? '', room(), boss?.desk.x ?? room().width / 2 - 1.2);
+  const beacon = beaconLevel(agents.map((a) => a.runtime.status));
+  showBeaconLevel(beacon);
+  drawRoom(ctx, state?.project ?? '', room(), boss?.desk.x ?? room().width / 2 - 1.2, beacon, t);
   for (const agent of agents) drawDeskFloor(ctx, agent, agent.id === selectedId);
 
   const drawables: Drawable[] = [...decorDrawables(room())];

@@ -34,10 +34,13 @@ export function renderPage(options: PageOptions): string {
     <strong id="project">Crew View</strong>
     <span id="session"></span>
   </header>
-  <button id="recenter" hidden title="Recentrer la vue (ou double-clic dans la salle)">⤢ Recentrer</button>
+  <div id="corner">
+    <ul id="legend" aria-label="Légende du gyrophare"></ul>
+    <button id="recenter" hidden title="Recentrer la vue (ou double-clic dans la salle)">⤢ Recentrer</button>
+    <aside id="panel" hidden></aside>
+  </div>
   <div id="notice" hidden></div>
   <div id="dialog" hidden><span id="dialog-speaker"></span><span id="dialog-text"></span></div>
-  <aside id="panel" hidden></aside>
   <script nonce="${options.nonce}" src="${options.scriptUri}"></script>
 </body>
 </html>`;

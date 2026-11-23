@@ -12,6 +12,8 @@ export function emptyUsage(): TokenUsage {
 export function usageOfMessage(message: any): TokenUsage | undefined {
   const usage = message?.usage;
   if (!usage || typeof usage !== 'object') return undefined;
+  // Message écrit par Claude Code lui-même (erreur, interruption) : aucun appel au modèle.
+  if (message.model === '<synthetic>') return undefined;
   const n = (value: unknown) => (typeof value === 'number' && Number.isFinite(value) ? value : 0);
   const model = typeof message.model === 'string' ? message.model : 'inconnu';
   const result: TokenUsage = {

@@ -3,6 +3,7 @@
 
 import type { Accessory, AgentStatus, RoomLayout, SceneAgent } from '../types';
 import { ellipse, iso, onWall, poly, TZ, WALL_UNIT, withAlpha } from './iso';
+import { type BeaconLevel, drawBeacon } from './beacon';
 import { drawSprite, drawSpriteIn } from './sprites';
 import { STATUS_COLORS } from './status';
 
@@ -17,7 +18,14 @@ export function doorOf(room: RoomLayout): { y: number; width: number } {
 
 // ---- Sol et murs ---------------------------------------------------------------------
 
-export function drawRoom(ctx: CanvasRenderingContext2D, projectName: string, room: RoomLayout, bossX: number): void {
+export function drawRoom(
+  ctx: CanvasRenderingContext2D,
+  projectName: string,
+  room: RoomLayout,
+  bossX: number,
+  beacon: BeaconLevel,
+  t: number,
+): void {
   const { width: W, depth: D } = room;
   const H = WALL_HEIGHT;
 
@@ -53,6 +61,12 @@ export function drawRoom(ctx: CanvasRenderingContext2D, projectName: string, roo
   onWallSprite(ctx, 'left', door.y + door.width, 2.15, 'decor/porte.svg');
   drawSignage(ctx, projectName);
   onWallSprite(ctx, 'back', bossX + 0.8, 2.5, 'decor/cadre.svg');
+  // Gyrophare dans l'angle du fond, face au spectateur ; sa lumière reste sur le mur du fond.
+  ctx.save();
+  clipTo(ctx, [[0, 0, 0], [W, 0, 0], [W, 0, H], [0, 0, H]]);
+  onWall(ctx, 'back', BEACON_U, 2.42);
+  drawBeacon(ctx, beacon, t);
+  ctx.restore();
   drawClock(ctx, W - 2.6, 2.25);
 }
 
@@ -78,9 +92,13 @@ function onWallSprite(ctx: CanvasRenderingContext2D, wall: 'back' | 'left', u: n
   ctx.restore();
 }
 
+/** Gyrophare près de l'angle du fond, puis l'enseigne juste à sa droite (positions le long du mur, en tuiles). */
+const BEACON_U = 0.4;
+const SIGN_U = 0.9;
+
 function drawSignage(ctx: CanvasRenderingContext2D, projectName: string): void {
   ctx.save();
-  onWall(ctx, 'back', 0.6, 2.55);
+  onWall(ctx, 'back', SIGN_U, 2.55);
   drawSprite(ctx, 'decor/enseigne.svg', { x: 0, y: 0 });
   ctx.fillStyle = 'rgba(22,24,27,0.42)';
   ctx.font = '600 13px "Segoe UI", system-ui, sans-serif';

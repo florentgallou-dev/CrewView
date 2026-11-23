@@ -109,7 +109,7 @@ Les fichiers Copilot restent la source : modifiez-les puis régénérez.
 
 Chaque élément de l'open-space est un fichier SVG de `resources/theme/` :
 - **mobilier :** bureaux, écran, portable ;
-- **décor :** sol, murs, porte, enseigne, cadre, horloge, armoire, fontaine, plante ;
+- **décor :** sol, murs, porte, enseigne, cadre, horloge, gyrophare, armoire, fontaine, plante ;
 - **accessoires ;**
 - **fonds d'écran** selon le statut ;
 - **personnage :** pièces animées (tête, buste de face et de dos, bras, avant-bras, jambe, articulation, dossier) et `pivots.json`.
@@ -138,6 +138,18 @@ Les conventions (échelle, point d'ancrage, perspective isométrique, `currentCo
 
 Pendant le travail (réflexion, lecture, écriture, exécution), l'agent est **de dos, face à son écran**, qui affiche son activité : page qui défile, code qui s'écrit, terminal, points de réflexion. Au repos, quand il parle, attend votre réponse ou a fini, il se retourne vers vous.
 
+**Gyrophare.** Fixé au mur du fond, dans l'angle à gauche de l'enseigne, il résume l'état de toute l'équipe :
+
+| Couleur | État | Statuts |
+|---|---|---|
+| 🔵 bleu | attend ta réponse | Attend votre réponse |
+| 🔴 rouge | en travail : écriture | Écrit, Exécute |
+| 🟠 orange | en travail : réflexion | Réfléchit, Parle, Délègue |
+| 🟡 jaune | en travail : lecture | Lit |
+| 🟢 vert | libre pour la suite | Disponible, Terminé |
+
+Il tourne tant qu'il n'est pas vert et reste fixe en vert. Une légende en haut à droite de la vue rappelle les couleurs et met en gras l'état en cours (pastilles seules sur une vue étroite, libellé au survol). Quand plusieurs agents travaillent, la couleur suit l'ordre du tableau : une question passe avant tout, puis l'activité la plus lourde. Un agent qui délègue passe après la lecture, pour laisser voir ce que font ses sous-agents. Une demande de permission (« Autoriser cette commande ? ») n'est pas écrite dans le transcript et n'allume donc pas le bleu.
+
 **Déplacements.** Chaque délégation et chaque rapport sont mémorisés pendant 45 s avec un identifiant. Une vue ouverte, rechargée ou reconnectée rejoue ceux qu'elle n'a pas encore montrés. **Passage de relais :** si l'agent principal délègue pendant qu'un agent vient lui rendre son rapport, c'est cet agent qui emporte le dossier jusqu'au suivant. Un agent relancé alors qu'il avait été lancé dans une session précédente est retrouvé par son type.
 
 **Navigation.** Molette pour zoomer, glisser pour se déplacer, double-clic dans la salle (ou bouton « Recentrer ») pour revenir au cadrage complet.
@@ -160,7 +172,7 @@ Les compteurs sont lus tels quels dans le champ `usage` de chaque réponse du mo
 | Tokens produits (dont réflexion) | `output_tokens` (`output_tokens_details.thinking_tokens`) |
 | Recherches web, Pages web lues | `server_tool_use.web_search_requests` / `web_fetch_requests` |
 
-Le **coût estimé** est la seule valeur calculée. Il applique la grille publique de l'API Anthropic (`src/pricing.ts`, relevée le 2026-10-20) :
+Le **coût estimé** est la seule valeur calculée. Il applique la grille publique de l'API Anthropic (`src/pricing.ts`, relevée le 2026-10-20, Fable 5.2 ajouté le 2026-11-23) :
 - écriture du cache : 1,25 × le prix d'entrée (5 min) ou 2 × (1 h) ;
 - lecture du cache : taux propre à chaque modèle ;
 - Haiku 5.5 : deux grilles selon la taille du prompt ;
@@ -169,6 +181,17 @@ Le **coût estimé** est la seule valeur calculée. Il applique la grille publiq
 - recherches web : 10 $ les 1 000.
 
 Un modèle sans tarif connu est exclu de l'estimation, et l'écran le signale. Le **coût réel** est celui que Claude Code enregistre lui-même pour la session (enregistrement `cost-state`). Il n'existe qu'au niveau de la session.
+
+### Barre d'état
+
+À droite de « Crew », la barre d'état de VS Code affiche pour le projet courant, par exemple `34 % · ≈ 2,41 $ · 1 h 12` :
+- **% de contexte** de la session principale, calculé comme l'indicateur de Claude Code : entrée + cache écrit + cache lu de la dernière réponse, rapportés à la fenêtre du modèle. Les sous-agents ont chacun leur propre contexte et n'entrent pas dans ce chiffre.
+- **Coût estimé** de la session, sous-agents compris.
+- **Durée de la session**, depuis son premier message (une session reprise avec `--resume` garde sa date de début ; `/clear` démarre une nouvelle session). L'infobulle indique aussi l'heure du dernier échange.
+
+Le fond passe en orange à 80 % de contexte et en rouge à 90 %. L'infobulle détaille les tokens, le modèle, le coût de la demande en cours, le coût enregistré par Claude Code, l'heure de début et le dernier échange. Un clic ouvre la vue « Demandes ».
+
+La fenêtre n'est pas écrite dans le transcript. Par défaut, elle suit la table de Claude Code : 1 M pour les modèles récents (Opus 4.7 et suivants, Sonnet 5 et suivants, Fable, Haiku 5.5), 200 k pour les plus anciens. Si ton compte n'a pas accès au contexte 1 M, règle `crewView.contextWindow` sur `200k` (aussi dans l'onglet Paramètres de la barre latérale).
 
 ## Développement
 

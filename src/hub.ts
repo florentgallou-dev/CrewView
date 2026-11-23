@@ -151,6 +151,9 @@ export class CrewHub {
       dialog: tracker?.dialog,
       requests: tracker?.requests ?? [],
       sessionCost: tracker?.sessionCost,
+      context: tracker?.context,
+      startedAt: tracker?.startedAt,
+      lastActivityAt: tracker?.lastActivityAt,
       moves: tracker?.moves ?? [],
       room: this.layout.room,
     };

@@ -101,6 +101,9 @@ test('bilan par demande : un subagent est imputé à la demande qui l’a lancé
   // Opus 5.5 : 10 × 4 + 60 × 5 + 40 × 8 + 1000 × 0,20 + 11 × 20, par million de tokens.
   assert.ok(Math.abs(second.total.costUsd - (10 * 4 + 60 * 5 + 40 * 8 + 1000 * 0.2 + 11 * 20) / 1e6) < 1e-12);
   assert.equal(tracker.runtimeOf('explorateur').usage.calls, 1);
+  // Contexte : dernière réponse de la session principale seulement (10 + 100 + 1000), pas celle du sous-agent.
+  assert.deepEqual(tracker.context, { tokens: 1110, model: 'claude-opus-5-5' });
+  assert.ok(tracker.startedAt !== undefined && tracker.lastActivityAt !== undefined && tracker.startedAt < tracker.lastActivityAt);
 });
 
 test('coût réel de la session lu dans l’enregistrement cost-state', () => {

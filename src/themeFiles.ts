@@ -13,6 +13,7 @@ export const THEME_FILES = [
   'decor/enseigne.svg',
   'decor/cadre.svg',
   'decor/horloge.svg',
+  'decor/gyrophare.svg',
   'decor/armoire.svg',
   'decor/fontaine.svg',
   'decor/plante.svg',

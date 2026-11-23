@@ -11,7 +11,7 @@ import type { Accessory, AgentPatch, Desk, ProjectPatch, SettingsAgent, Settings
 export const ACCESSORIES: Accessory[] = ['none', 'plant', 'lamp', 'mug', 'books', 'server', 'magnifier', 'trophy', 'shield'];
 const TEMP_PREFIX = 'interim-';
 
-export function buildSettings(hub: CrewHub, general: { port: number; claudeConfigDir: string; themeDir: string }): SettingsData {
+export function buildSettings(hub: CrewHub, general: { port: number; claudeConfigDir: string; themeDir: string; contextWindow: string }): SettingsData {
   const state = hub.snapshot();
   const config = hub.config;
   const definitions = hub.definitions;
@@ -67,6 +67,7 @@ export function buildSettings(hub: CrewHub, general: { port: number; claudeConfi
     port: general.port,
     claudeConfigDir: general.claudeConfigDir,
     themeDir: general.themeDir,
+    contextWindow: general.contextWindow,
   };
 }
 

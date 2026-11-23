@@ -3,7 +3,7 @@
 // ouvre une tâche confiée à un agent du projet, ou à un intérimaire si le type n'est pas défini.
 
 import { normalizeId } from './discovery';
-import type { AgentRuntime, AgentStatus, BubbleKind, Dialog, Move, RequestSummary, SessionCost, TokenUsage } from './types';
+import type { AgentRuntime, AgentStatus, BubbleKind, ContextUsage, Dialog, Move, RequestSummary, SessionCost, TokenUsage } from './types';
 import { addUsage, emptyUsage, usageOfMessage } from './usage';
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- les transcripts sont du JSON non typé */
@@ -61,6 +61,11 @@ export class SessionTracker {
   /** Demandes de la session, dans l'ordre chronologique. */
   readonly requests: RequestSummary[] = [];
   sessionCost?: SessionCost;
+  /** Remplissage du contexte de la session principale (dernière réponse du modèle). */
+  context?: ContextUsage;
+  /** Premier et dernier échange daté de la session (prompts et réponses, sous-agents compris). */
+  startedAt?: number;
+  lastActivityAt?: number;
   /** Derniers déplacements ; la scène joue ceux qu'elle n'a pas encore montrés. */
   readonly moves: Move[] = [];
   /**
@@ -85,6 +90,7 @@ export class SessionTracker {
   handleMain(record: TranscriptRecord): void {
     if (!record || record.isSidechain) return;
     const at = timeOf(record);
+    this.markActivity(record);
     if (record.type === 'ai-title' && typeof record.aiTitle === 'string') {
       this.title = record.aiTitle;
       this.events.onChange();
@@ -94,6 +100,7 @@ export class SessionTracker {
     } else if (record.type === 'user') {
       this.handleMainUser(record, at);
     } else if (record.type === 'assistant') {
+      this.context = contextOf(record.message) ?? this.context;
       if (this.handleAssistant(this.main, record, at, this.currentRequest(at).id)) this.apply(this.main, at, 'done');
     }
   }
@@ -112,6 +119,7 @@ export class SessionTracker {
     const task = toolUseId ? this.tasks.get(toolUseId) : undefined;
     if (!task || !record) return;
     const at = timeOf(record);
+    this.markActivity(record);
     if (record.type === 'assistant') {
       if (this.handleAssistant(task.agentId, record, at, task.requestId)) this.finishTask(toolUseId!, at);
     } else if (record.type === 'user' && hasToolResult(record.message?.content)) {
@@ -328,6 +336,15 @@ export class SessionTracker {
     this.events.onChange();
   }
 
+  /** Durée de la session : seuls les prompts et les réponses datés comptent (pas les métadonnées). */
+  private markActivity(record: TranscriptRecord): void {
+    if (record.type !== 'user' && record.type !== 'assistant') return;
+    const at = typeof record.timestamp === 'string' ? Date.parse(record.timestamp) : NaN;
+    if (!Number.isFinite(at)) return;
+    if (this.startedAt === undefined || at < this.startedAt) this.startedAt = at;
+    if (this.lastActivityAt === undefined || at > this.lastActivityAt) this.lastActivityAt = at;
+  }
+
   // ---- Consommation ---------------------------------------------------------------------
 
   /** Demande en cours ; avant tout prompt (session reprise), une demande « début de session » la remplace. */
@@ -354,6 +371,14 @@ export class SessionTracker {
     addUsage(request.total, usage, sign);
     addUsage((request.byAgent[agentId] ??= emptyUsage()), usage, sign);
   }
+}
+
+/** Contexte envoyé au modèle pour une réponse : le calcul de l'indicateur de Claude Code. */
+function contextOf(message: TranscriptRecord): ContextUsage | undefined {
+  const usage = usageOfMessage(message);
+  const tokens = usage ? usage.input + usage.cacheWrite + usage.cacheRead : 0;
+  if (!usage || tokens === 0 || typeof message?.model !== 'string') return undefined;
+  return { tokens, model: message.model };
 }
 
 /** Coût réel cumulé de la session, tel que Claude Code l'enregistre. */

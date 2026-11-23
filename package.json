@@ -2,7 +2,7 @@
   "name": "crew-view",
   "displayName": "Crew View",
   "description": "Open-space isométrique animé en temps réel représentant les agents Claude Code d'un projet.",
-  "version": "0.6.0",
+  "version": "0.7.2",
   "publisher": "digiworks",
   "license": "UNLICENSED",
   "private": true,
@@ -133,11 +133,23 @@
           "type": "string",
           "default": "",
           "description": "Dossier de graphismes SVG commun à tous les projets (même organisation que resources/theme). Le dossier .crew-view/theme du projet reste prioritaire ; les fichiers absents viennent du thème par défaut."
+        },
+        "crewView.contextWindow": {
+          "type": "string",
+          "enum": ["auto", "200k", "1m"],
+          "enumDescriptions": [
+            "Selon le modèle, comme Claude Code : 1 M pour les modèles récents, 200 k pour les plus anciens.",
+            "200 000 tokens (compte sans accès au contexte 1 M).",
+            "1 000 000 tokens."
+          ],
+          "default": "auto",
+          "description": "Taille de la fenêtre de contexte utilisée pour le pourcentage affiché dans la barre d'état."
         }
       }
     }
   },
   "scripts": {
+    "vscode:prepublish": "npm run build",
     "build": "node esbuild.mjs",
     "watch": "node esbuild.mjs --watch",
     "typecheck": "tsc --noEmit",

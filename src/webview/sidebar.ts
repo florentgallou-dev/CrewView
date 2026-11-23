@@ -226,6 +226,13 @@ function renderSettings(): Child[] {
       field('Dossier de graphismes commun',
         textInput(d.themeDir, 'aucun (thème par défaut)', (value) => post({ type: 'updateSetting', key: 'themeDir', value: value.trim() })),
       ),
+      field('Fenêtre de contexte (barre d’état)',
+        selectInput(
+          [['auto', 'Automatique (selon le modèle)'], ['200k', '200 000 tokens'], ['1m', '1 000 000 tokens']],
+          d.contextWindow,
+          (value) => post({ type: 'updateSetting', key: 'contextWindow', value }),
+        ),
+      ),
     ),
     section('Actions',
       el('div', { className: 'actions' },

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-11 -15 22 25" width="22" height="25">
+  <!-- Gyrophare du mur du fond, à plat. Ancre (0,0) : milieu du bas du dôme. currentColor = couleur de l'état de l'équipe.
+       La rotation (reflet, faisceaux, halo) est dessinée par l'extension autour du point (0,-6). -->
+  <rect x="-3" y="4" width="6" height="6" rx="1" fill="#3a3f46"/>
+  <rect x="-10" y="0" width="20" height="5" rx="1.5" fill="#2a2e33"/>
+  <rect x="-9" y="1" width="18" height="1.2" rx="0.6" fill="#555b63"/>
+  <path d="M-7.5 0.3V-6a7.5 7.5 0 0 1 15 0V0.3z" fill="currentColor"/>
+  <path d="M-7.5 0.3V-6a7.5 7.5 0 0 1 15 0V0.3z" fill="#ffffff" fill-opacity="0.18"/>
+  <path d="M-4.5 0.3V-6.5M0 0.3V-12.9M4.5 0.3V-6.5" stroke="#16181b" stroke-opacity="0.18" stroke-width="0.8"/>
+  <path d="M-5.2 -6.2a5.2 5.2 0 0 1 3.4 -4.6" stroke="#ffffff" stroke-opacity="0.6" stroke-width="1.3" stroke-linecap="round" fill="none"/>
+  <rect x="-2" y="-14.6" width="4" height="1.8" rx="0.8" fill="#2a2e33"/>
+</svg>

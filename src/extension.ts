@@ -11,6 +11,7 @@ import { CrewHub } from './hub';
 import { placeAgents } from './layout';
 import { startServer, type RunningServer } from './server';
 import { CrewSidebar } from './sidebarViews';
+import { CrewStatusBar } from './statusBar';
 import { copyDefaultTheme, defaultThemeDir, PROJECT_THEME_DIR } from './theme';
 import type { ClientMessage } from './types';
 
@@ -21,6 +22,7 @@ const servers = new Map<string, Promise<RunningServer>>();
 const selections = new Map<string, string | undefined>();
 let currentRoot: string | undefined;
 let sidebar: CrewSidebar | undefined;
+let statusBar: CrewStatusBar | undefined;
 /** Journal de diagnostic : Affichage › Sortie › Crew View. */
 let output: vscode.OutputChannel | undefined;
 
@@ -69,6 +71,7 @@ export function activate(context: vscode.ExtensionContext): void {
         const themeDir = vscode.workspace.getConfiguration('crewView').get<string>('themeDir');
         for (const { hub } of hubs.values()) hub.setThemeDir(themeDir);
       }
+      if (event.affectsConfiguration('crewView.contextWindow')) statusBar?.render();
       if (event.affectsConfiguration('crewView')) sidebar?.refreshSettings();
     }),
   );
@@ -78,7 +81,9 @@ export function activate(context: vscode.ExtensionContext): void {
   item.tooltip = 'Ouvrir l’open-space des agents';
   item.command = 'crewView.open';
   item.show();
-  context.subscriptions.push(item);
+  statusBar = new CrewStatusBar({ acquireHub, releaseHub });
+  statusBar.setRoot(currentRoot);
+  context.subscriptions.push(item, statusBar);
 }
 
 export function deactivate(): void {
@@ -106,6 +111,7 @@ function setCurrentRoot(root: string | undefined): void {
   if (root === currentRoot) return;
   currentRoot = root;
   sidebar?.setRoot(root);
+  statusBar?.setRoot(root);
 }
 
 function acquireHub(root: string): CrewHub {

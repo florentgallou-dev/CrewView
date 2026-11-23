@@ -38,7 +38,8 @@ body {
   position: absolute;
   top: 12px;
   left: 12px;
-  max-width: calc(100% - 24px);
+  /* Laisse la place à la légende du gyrophare, en haut à droite. */
+  max-width: calc(100% - 220px);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -210,11 +211,10 @@ body {
 /* ---- Panneau de détail ---------------------------------------------------------- */
 
 #panel {
-  position: absolute;
-  top: 56px;
-  right: 12px;
-  bottom: 100px;
-  width: min(320px, calc(100% - 24px));
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  width: min(320px, calc(100vw - 24px));
   box-sizing: border-box;
   overflow: auto;
   padding: 16px;
@@ -467,9 +467,6 @@ button.link:hover {
 /* ---- Zoom ---- */
 
 #recenter {
-  position: absolute;
-  top: 12px;
-  right: 12px;
   padding: 6px 12px;
   background: rgba(255, 255, 255, 0.92);
   border: 1px solid var(--line);
@@ -485,4 +482,80 @@ button.link:hover {
 
 #scene {
   cursor: grab;
+}
+
+/* ---- Coin haut droit : légende du gyrophare, recentrage, panneau ---- */
+
+#corner {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  bottom: 100px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  pointer-events: none;
+}
+
+#corner > * {
+  pointer-events: auto;
+}
+
+#legend {
+  margin: 0;
+  padding: 7px 12px;
+  list-style: none;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
+#legend li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  opacity: 0.6;
+}
+
+#legend li.active {
+  opacity: 1;
+  color: var(--ink);
+  font-weight: 700;
+}
+
+#legend .swatch {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--beacon);
+}
+
+#legend:not([data-level="free"]) li.active .swatch {
+  animation: beacon-pulse var(--turn, 1.1s) ease-in-out infinite;
+}
+
+@keyframes beacon-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 transparent; }
+  50% { box-shadow: 0 0 6px 2px var(--beacon); }
+}
+
+@media (max-width: 500px) {
+  #topbar {
+    max-width: calc(100% - 160px);
+  }
+
+  #legend {
+    display: flex;
+    gap: 7px;
+    padding: 7px 10px;
+  }
+
+  #legend .label {
+    display: none;
+  }
 }

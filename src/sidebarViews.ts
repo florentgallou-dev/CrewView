@@ -132,6 +132,7 @@ export class CrewSidebar {
       port: general.get<number>('port') ?? 4719,
       claudeConfigDir: general.get<string>('claudeConfigDir') ?? '',
       themeDir: general.get<string>('themeDir') ?? '',
+      contextWindow: general.get<string>('contextWindow') ?? 'auto',
     });
     const signature = JSON.stringify(data);
     if (!force && signature === this.settingsSignature) return;
