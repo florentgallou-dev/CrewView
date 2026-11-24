@@ -1,17 +1,19 @@
-// Gyrophare du mur du fond : résume l'état de toute l'équipe en une couleur.
-// Il tourne tant qu'un agent est occupé ou attend une réponse, et reste fixe en vert quand l'équipe est libre.
+// Gyrophare de l'angle du fond : résume l'état de toute l'équipe en une couleur.
+// Il tourne tant qu'un agent est occupé, attend une réponse ou qu'une commande tourne en arrière-plan,
+// et reste fixe en vert quand l'équipe est libre. L'engrenage au-dessus d'un agent reprend la couleur de son état.
 
-import type { AgentStatus } from '../types';
+import type { AgentRuntime, AgentStatus } from '../types';
 import { withAlpha } from './iso';
 import { drawSprite } from './sprites';
 
-export type BeaconLevel = 'question' | 'writing' | 'thinking' | 'reading' | 'free';
+export type BeaconLevel = 'question' | 'writing' | 'thinking' | 'reading' | 'background' | 'free';
 
 export const BEACON_COLORS: Record<BeaconLevel, string> = {
   question: '#2f7de1',
   writing: '#e5383b',
   thinking: '#f08a24',
   reading: '#f2c12e',
+  background: '#8b5cf6',
   free: '#2fb36a',
 };
 
@@ -21,6 +23,7 @@ export const BEACON_LABELS: Record<BeaconLevel, string> = {
   writing: 'Écrit / exécute',
   thinking: 'Réfléchit',
   reading: 'Lit',
+  background: 'Arrière-plan',
   free: 'Libre',
 };
 
@@ -42,10 +45,18 @@ const LEVEL_OF: Record<AgentStatus, BeaconLevel> = {
  */
 const PRIORITY: AgentStatus[] = ['asking', 'writing', 'running', 'thinking', 'talking', 'reading', 'delegating', 'idle', 'done'];
 
-export function beaconLevel(statuses: Iterable<AgentStatus>): BeaconLevel {
+/** Couleur du gyrophare ; une commande en arrière-plan ne compte que si l'équipe semble libre. */
+export function beaconLevel(statuses: Iterable<AgentStatus>, background = false): BeaconLevel {
   let best = PRIORITY.length - 1;
   for (const status of statuses) best = Math.min(best, PRIORITY.indexOf(status));
-  return LEVEL_OF[PRIORITY[best]];
+  const level = LEVEL_OF[PRIORITY[best]];
+  return level === 'free' && background ? 'background' : level;
+}
+
+/** État d'un agent pour son engrenage ; undefined quand il est libre. */
+export function agentLevel(runtime: Pick<AgentRuntime, 'status' | 'background'>): BeaconLevel | undefined {
+  const level = beaconLevel([runtime.status], runtime.background.length > 0);
+  return level === 'free' ? undefined : level;
 }
 
 /** Durée d'un tour du gyrophare, en secondes. */
@@ -53,7 +64,7 @@ export const TURN_S = 1.1;
 /** Centre du dôme par rapport à l'ancre du SVG (milieu du bas du dôme). */
 const DOME = { x: 0, y: -6 };
 
-/** Dessine le gyrophare dans le repère à plat du mur (après onWall), ancre en (0,0). */
+/** Dessine le gyrophare de face, ancre en (0,0) ; sa lumière déborde librement autour de lui. */
 export function drawBeacon(ctx: CanvasRenderingContext2D, level: BeaconLevel, t: number): void {
   const color = BEACON_COLORS[level];
   if (level === 'free') {
@@ -89,7 +100,7 @@ function halo(ctx: CanvasRenderingContext2D, color: string, radius: number, alph
   ctx.fillRect(DOME.x - radius, DOME.y - radius, radius * 2, radius * 2);
 }
 
-/** Faisceau projeté sur le mur : cône horizontal dont la longueur suit la rotation. */
+/** Faisceau projeté sur les murs : cône horizontal dont la longueur suit la rotation. */
 function beam(ctx: CanvasRenderingContext2D, color: string, angle: number): void {
   const reach = Math.sin(angle) * 70;
   const strength = 0.12 + 0.28 * Math.max(0, Math.cos(angle));
@@ -109,6 +120,17 @@ function beam(ctx: CanvasRenderingContext2D, color: string, angle: number): void
   ctx.fill();
 }
 
+/** Durée d'un tour d'engrenage, en secondes. */
+const GEAR_TURN_S = 2.4;
+
+/** Engrenage tournant au-dessus d'un agent occupé, centré en (x, y). */
+export function drawGear(ctx: CanvasRenderingContext2D, x: number, y: number, level: BeaconLevel, t: number): void {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate((t / GEAR_TURN_S) * Math.PI * 2);
+  drawSprite(ctx, 'personnage/engrenage.svg', { x: 0, y: 0 }, BEACON_COLORS[level]);
+  ctx.restore();
+}
 
 /** Légende du coin haut droit : une ligne par couleur, l'état en cours mis en évidence. */
 export function createLegend(list: HTMLElement): (level: BeaconLevel) => void {

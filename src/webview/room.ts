@@ -61,10 +61,10 @@ export function drawRoom(
   onWallSprite(ctx, 'left', door.y + door.width, 2.15, 'decor/porte.svg');
   drawSignage(ctx, projectName);
   onWallSprite(ctx, 'back', bossX + 0.8, 2.5, 'decor/cadre.svg');
-  // Gyrophare dans l'angle du fond, face au spectateur ; sa lumière reste sur le mur du fond.
+  // Gyrophare fixé dans l'angle du fond, dessiné de face ; sa lumière déborde sur les deux murs et au-delà.
+  const corner = iso(0, 0, BEACON_Z);
   ctx.save();
-  clipTo(ctx, [[0, 0, 0], [W, 0, 0], [W, 0, H], [0, 0, H]]);
-  onWall(ctx, 'back', BEACON_U, 2.42);
+  ctx.translate(corner.x, corner.y);
   drawBeacon(ctx, beacon, t);
   ctx.restore();
   drawClock(ctx, W - 2.6, 2.25);
@@ -92,9 +92,9 @@ function onWallSprite(ctx: CanvasRenderingContext2D, wall: 'back' | 'left', u: n
   ctx.restore();
 }
 
-/** Gyrophare près de l'angle du fond, puis l'enseigne juste à sa droite (positions le long du mur, en tuiles). */
-const BEACON_U = 0.4;
-const SIGN_U = 0.9;
+/** Hauteur du gyrophare sur l'arête de l'angle du fond, et position de l'enseigne le long du mur (en tuiles). */
+const BEACON_Z = 2.42;
+const SIGN_U = 0.6;
 
 function drawSignage(ctx: CanvasRenderingContext2D, projectName: string): void {
   ctx.save();

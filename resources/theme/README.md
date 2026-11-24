@@ -28,11 +28,11 @@ Chaque élément de l'open-space est un fichier SVG de ce dossier. Pour changer 
 
 Une dalle de sol mesure 64 × 32 px.
 
-**Éléments muraux** (`mur-*`, `porte`, `enseigne`, `cadre`, `horloge`, `gyrophare`) : ils se dessinent **à plat, vus de face**, x vers la droite et y vers le bas. L'extension les incline sur le mur. Sur un mur, 1 tuile de longueur vaut 35,78 px et 1 tuile de hauteur vaut 32 px.
+**Éléments muraux** (`mur-*`, `porte`, `enseigne`, `cadre`, `horloge`) : ils se dessinent **à plat, vus de face**, x vers la droite et y vers le bas. L'extension les incline sur le mur. Sur un mur, 1 tuile de longueur vaut 35,78 px et 1 tuile de hauteur vaut 32 px.
 
 **Écrans** (`ecrans/*.svg`) : l'image est **étirée** sur la dalle de l'écran. Garde le format du `viewBox="0 0 46 32"`.
 
-**`currentColor`** prend la couleur de l'agent : bandeau du bureau, tasse, lampe, bouclier, badge, dossier. Dans `ecrans/`, il prend la couleur du statut (violet pour la réflexion, rouge pour la question…). Dans `decor/gyrophare.svg`, il prend la couleur de l'état de l'équipe (bleu, rouge, orange, jaune ou vert).
+**`currentColor`** prend la couleur de l'agent : bandeau du bureau, tasse, lampe, bouclier, badge, dossier. Dans `ecrans/`, il prend la couleur du statut (violet pour la réflexion, rouge pour la question…). Dans `decor/gyrophare.svg`, il prend la couleur de l'état de l'équipe (bleu, rouge, orange, jaune, violet ou vert), et dans `personnage/engrenage.svg` celle de l'état de l'agent.
 
 Les textes sont permis (`<text>`) avec les polices installées sur la machine. Les images ou polices externes ne sont pas chargées.
 
@@ -52,7 +52,7 @@ Les textes sont permis (`<text>`) avec les polices installées sur la machine. L
 | `decor/enseigne.svg` | « CREW » ; le nom du projet est écrit 20 px dessous | début de la ligne de base |
 | `decor/cadre.svg` | cadre au-dessus du bureau principal | coin haut-gauche |
 | `decor/horloge.svg` | cadran ; les aiguilles sont dessinées par l'extension | centre |
-| `decor/gyrophare.svg` | gyrophare dans l'angle du fond, à gauche de l'enseigne ; reflet, faisceaux et halo sont animés autour du point (0 ; −6) | milieu du bas du dôme |
+| `decor/gyrophare.svg` | gyrophare fixé dans l'angle du fond, **dessiné de face** (non incliné) ; reflet, faisceaux et halo sont animés autour du point (0 ; −6) | milieu du bas du dôme, posé sur l'arête de l'angle |
 | `decor/armoire.svg` | armoire (deux exemplaires contre le mur de gauche) | coin arrière, au sol |
 | `decor/fontaine.svg` | fontaine à eau ; la bulle est animée | coin arrière, au sol |
 | `decor/plante.svg` | grande plante ; la seconde est la même, réduite à 80 % | coin arrière du pot, au sol |
@@ -67,6 +67,7 @@ Les textes sont permis (`<text>`) avec les polices installées sur la machine. L
 | `personnage/jambe.svg` | jambe (hanche → pied), visible en marchant | articulation de départ |
 | `personnage/articulation.svg` | rond posé sur chaque épaule, coude, main, hanche et pied | centre |
 | `personnage/dossier.svg` | dossier porté lors d'une délégation | centre |
+| `personnage/engrenage.svg` | engrenage d'un agent occupé, en haut à droite de sa tête ; l'extension le fait tourner | centre de rotation |
 
 **Écrans par statut :**
 
@@ -105,4 +106,4 @@ Les postures (marche, frappe au clavier, bras levé, main derrière la tête, do
 - les ombres et les zones colorées au sol ;
 - la lumière de la salle ;
 - les arêtes du haut des murs ;
-- les animations : lignes des écrans, lueur, aiguilles de l'horloge, rotation du gyrophare, bulle de la fontaine, voyants du serveur.
+- les animations : lignes des écrans, lueur, aiguilles de l'horloge, rotation du gyrophare et des engrenages, bulle de la fontaine, voyants du serveur.

@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-7.5 -7.5 15 15" width="15" height="15">
+  <!-- Engrenage au-dessus d'un agent en travail. Ancre (0,0) : centre de rotation. currentColor = couleur de l'état de l'agent (celle du gyrophare). -->
+  <path d="M4.63 -0.81 L6.16 -0.69 L6.16 0.69 L4.63 0.81 L3.85 2.70 L4.85 3.87 L3.87 4.85 L2.70 3.85 L0.81 4.63 L0.69 6.16 L-0.69 6.16 L-0.81 4.63 L-2.70 3.85 L-3.87 4.85 L-4.85 3.87 L-3.85 2.70 L-4.63 0.81 L-6.16 0.69 L-6.16 -0.69 L-4.63 -0.81 L-3.85 -2.70 L-4.85 -3.87 L-3.87 -4.85 L-2.70 -3.85 L-0.81 -4.63 L-0.69 -6.16 L0.69 -6.16 L0.81 -4.63 L2.70 -3.85 L3.87 -4.85 L4.85 -3.87 L3.85 -2.70Z" fill="currentColor" stroke="#16181b" stroke-opacity="0.35" stroke-width="0.8" stroke-linejoin="round"/>
+  <circle r="2" fill="#ffffff" stroke="#16181b" stroke-opacity="0.35" stroke-width="0.8"/>
+</svg>

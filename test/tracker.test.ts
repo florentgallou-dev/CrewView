@@ -150,3 +150,35 @@ test('relance d’un agent d’une session précédente : retrouvé par son type
   assert.deepEqual(moves, ['delegate:orchestrateur>explorateur']);
   assert.equal(tracker.runtimeOf('explorateur').status, 'thinking');
 });
+
+test('commande en arrière-plan : suivie jusqu’à sa notification de fin, ou arrêtée par TaskStop', () => {
+  const { tracker } = setup();
+  const bash = (id: string, description: string) => assistant([{ type: 'tool_use', id, name: 'Bash', input: { command: 'make mutate', description, run_in_background: true } }]);
+  const launched = (id: string, taskId: string) => ({ type: 'user', timestamp: at(), message: { content: [{ type: 'tool_result', tool_use_id: id, content: `Command running in background with ID: ${taskId}. Output is being written to: /tmp/x` }] } });
+  const notification = (id: string, taskId: string) => ({ type: 'user', timestamp: at(), origin: { kind: 'task-notification' }, message: { content: `<task-notification>\n<task-id>${taskId}</task-id>\n<tool-use-id>${id}</tool-use-id>\n<status>completed</status>\n</task-notification>` } });
+  const background = () => tracker.runtimeOf('orchestrateur').background.map((b) => `${b.label}:${b.taskId}`);
+
+  tracker.handleMain(bash('b1', 'Mutation du lot 1'));
+  tracker.handleMain(launched('b1', 'bk1'));
+  tracker.handleMain(bash('b2', 'Suite complète'));
+  tracker.handleMain(launched('b2', 'bk2'));
+  assert.deepEqual(background(), ['Mutation du lot 1:bk1', 'Suite complète:bk2']);
+
+  tracker.handleMain(notification('b1', 'bk1'));
+  assert.deepEqual(background(), ['Suite complète:bk2']);
+  tracker.handleMain(assistant([{ type: 'tool_use', id: 's1', name: 'TaskStop', input: { task_id: 'bk2' } }]));
+  assert.deepEqual(background(), []);
+
+  // Résumé de fin de session : plusieurs task-id, uniquement en file d'attente.
+  tracker.handleMain(bash('b4', 'Orpheline 1'));
+  tracker.handleMain(launched('b4', 'bk4'));
+  tracker.handleMain(bash('b5', 'Orpheline 2'));
+  tracker.handleMain(launched('b5', 'bk5'));
+  tracker.handleMain({ type: 'queue-operation', operation: 'enqueue', timestamp: at(), content: '<task-notification>\n<task-id>bk4</task-id>\n<task-id>bk5</task-id>\n<status>stopped</status>\n</task-notification>' });
+  assert.deepEqual(background(), []);
+
+  tracker.handleMain(bash('b3', 'Sans fin'));
+  tracker.handleMain(launched('b3', 'bk3'));
+  tracker.sweep(Date.now() + 4 * 3_600_000);
+  assert.deepEqual(background(), [], 'abandonnée après 3 h sans activité');
+});

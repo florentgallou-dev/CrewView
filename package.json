@@ -2,7 +2,7 @@
   "name": "crew-view",
   "displayName": "Crew View",
   "description": "Open-space isométrique animé en temps réel représentant les agents Claude Code d'un projet.",
-  "version": "0.7.2",
+  "version": "0.8.0",
   "publisher": "digiworks",
   "license": "UNLICENSED",
   "private": true,

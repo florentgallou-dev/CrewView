@@ -60,6 +60,12 @@ export function statusSummary(state: SceneState, setting: ContextWindowSetting =
   }
   if (state.sessionCost) details.push(`Coût enregistré par Claude Code : ${dollars(state.sessionCost.totalUsd)}`);
 
+  const background = state.agents.flatMap((agent) => agent.runtime.background.map((task) => ({ agent: agent.name, task })));
+  if (background.length) {
+    details.push(`**En arrière-plan :** ${background.length} commande(s) en cours`);
+    for (const { agent, task } of background) details.push(`- ${task.label} — ${agent}, depuis ${clockTime(task.since, now)}`);
+  }
+
   if (state.startedAt !== undefined) {
     const open = duration(now - state.startedAt);
     parts.push(`$(clock) ${open}`);

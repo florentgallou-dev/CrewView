@@ -54,3 +54,12 @@ test('barre d’état : durée de la session et dernier échange', () => {
   assert.ok(summary?.details.includes('**Session ouverte depuis** 14 h 05 (1 h 12)'));
   assert.ok(summary?.details.includes('Dernier échange : il y a 3 min'));
 });
+
+test('barre d’état : commandes en arrière-plan dans l’infobulle', () => {
+  const now = new Date(2026, 10, 24, 9, 0).getTime();
+  const runtime = { status: 'idle' as const, statusAt: 0, files: [], history: [], usage: emptyUsage(), activeTasks: 0, background: [{ toolUseId: 't', label: 'Mutation du lot 1', since: new Date(2026, 10, 24, 8, 21).getTime() }] };
+  const agent = { id: 'claude', name: 'Claude', description: '', color: '#000', accessory: 'none' as const, desk: { x: 0, y: 0, w: 1, d: 1, kind: 'boss' as const }, spot: [0, 0] as [number, number], isMain: true, temp: false, runtime };
+  const summary = statusSummary(state({ agents: [agent], startedAt: now - 3_600_000 }), 'auto', now);
+  assert.ok(summary?.details.includes('**En arrière-plan :** 1 commande(s) en cours'));
+  assert.ok(summary?.details.includes('- Mutation du lot 1 — Claude, depuis 8 h 21'));
+});

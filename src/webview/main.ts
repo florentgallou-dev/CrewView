@@ -7,7 +7,7 @@ import { renderAgentDetail } from './detail';
 import { el, fill } from './dom';
 import { drawFigure, FIGURE_HEIGHT, poseFor } from './figure';
 import { iso, type Point } from './iso';
-import { beaconLevel, createLegend } from './beacon';
+import { agentLevel, beaconLevel, createLegend, drawGear } from './beacon';
 import { decorDrawables, deskDepth, doorOf, drawDesk, drawDeskFloor, drawNameplate, drawRoom, type Drawable, WALL_HEIGHT } from './room';
 import { setTheme } from './sprites';
 import { BUBBLE_TTL_MS, STATUS_COLORS, STATUS_LABELS } from './status';
@@ -180,7 +180,10 @@ function frame(now: number): void {
 
   const agents = state?.agents ?? [];
   const boss = agents.find((a) => a.isMain);
-  const beacon = beaconLevel(agents.map((a) => a.runtime.status));
+  const beacon = beaconLevel(
+    agents.map((a) => a.runtime.status),
+    agents.some((a) => a.runtime.background.length > 0),
+  );
   showBeaconLevel(beacon);
   drawRoom(ctx, state?.project ?? '', room(), boss?.desk.x ?? room().width / 2 - 1.2, beacon, t);
   for (const agent of agents) drawDeskFloor(ctx, agent, agent.id === selectedId);
@@ -220,7 +223,11 @@ function drawAgent(c: CanvasRenderingContext2D, agent: SceneAgent, position: Vec
     pose.back = true;
   }
   const ring = agent.id === selectedId ? agent.color : status !== 'idle' ? STATUS_COLORS[status] : undefined;
-  drawFigure(c, iso(position[0], position[1]), pose, agent.color, t, ring);
+  const foot = iso(position[0], position[1]);
+  drawFigure(c, foot, pose, agent.color, t, ring);
+  // Engrenage de la couleur de son état, en haut à droite de la tête (les bulles s'affichent au-dessus).
+  const level = agentLevel(agent.runtime);
+  if (level) drawGear(c, foot.x + 11, foot.y - FIGURE_HEIGHT + 1 - pose.bob, level, t);
 }
 
 /** Cadrage automatique de toute la salle, puis zoom et déplacement de l'utilisateur. */

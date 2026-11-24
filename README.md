@@ -147,7 +147,7 @@ Les conventions (échelle, point d'ancrage, perspective isométrique, `currentCo
 
 Pendant le travail (réflexion, lecture, écriture, exécution), l'agent est **de dos, face à son écran**, qui affiche son activité : page qui défile, code qui s'écrit, terminal, points de réflexion. Au repos, quand il parle, attend votre réponse ou a fini, il se retourne vers vous.
 
-**Gyrophare.** Fixé au mur du fond, dans l'angle à gauche de l'enseigne, il résume l'état de toute l'équipe :
+**Gyrophare.** Fixé dans l'angle du fond et dessiné de face, il résume l'état de toute l'équipe :
 
 | Couleur | État | Statuts |
 |---|---|---|
@@ -155,9 +155,14 @@ Pendant le travail (réflexion, lecture, écriture, exécution), l'agent est **d
 | 🔴 rouge | en travail : écriture | Écrit, Exécute |
 | 🟠 orange | en travail : réflexion | Réfléchit, Parle, Délègue |
 | 🟡 jaune | en travail : lecture | Lit |
+| 🟣 violet | commande en arrière-plan | aucun agent occupé, mais une commande lancée en arrière-plan tourne encore |
 | 🟢 vert | libre pour la suite | Disponible, Terminé |
 
 Il tourne tant qu'il n'est pas vert et reste fixe en vert. Une légende en haut à droite de la vue rappelle les couleurs et met en gras l'état en cours (pastilles seules sur une vue étroite, libellé au survol). Quand plusieurs agents travaillent, la couleur suit l'ordre du tableau : une question passe avant tout, puis l'activité la plus lourde. Un agent qui délègue passe après la lecture, pour laisser voir ce que font ses sous-agents. Une demande de permission (« Autoriser cette commande ? ») n'est pas écrite dans le transcript et n'allume donc pas le bleu.
+
+**Arrière-plan.** Une commande lancée en arrière-plan (`run_in_background`), par l'agent principal ou par un sous-agent, est en cours jusqu'à sa notification de fin, ou jusqu'à son arrêt par TaskStop / KillShell. Sans notification (Claude Code fermé pendant qu'elle tournait), elle est considérée comme terminée après 3 h sans activité dans la session. L'infobulle de la barre d'état liste les commandes en cours.
+
+**Engrenage.** Un engrenage tourne en haut à droite de la tête de chaque agent occupé, de la couleur du gyrophare pour son activité (violet s'il n'a qu'une commande en arrière-plan). Un agent libre n'en a pas.
 
 **Déplacements.** Chaque délégation et chaque rapport sont mémorisés pendant 45 s avec un identifiant. Une vue ouverte, rechargée ou reconnectée rejoue ceux qu'elle n'a pas encore montrés. **Passage de relais :** si l'agent principal délègue pendant qu'un agent vient lui rendre son rapport, c'est cet agent qui emporte le dossier jusqu'au suivant. Un agent relancé alors qu'il avait été lancé dans une session précédente est retrouvé par son type.
 

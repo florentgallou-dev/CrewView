@@ -77,6 +77,16 @@ export interface ContextUsage {
   model: string;
 }
 
+/** Commande lancée en arrière-plan par un agent, en cours jusqu'à sa notification de fin. */
+export interface BackgroundTask {
+  /** Identifiant de l'appel d'outil qui l'a lancée. */
+  toolUseId: string;
+  /** Identifiant de tâche donné par Claude Code (TaskStop, notification). */
+  taskId?: string;
+  label: string;
+  since: number;
+}
+
 export interface AgentRuntime {
   status: AgentStatus;
   statusAt: number;
@@ -88,6 +98,8 @@ export interface AgentRuntime {
   /** Consommation de l'agent sur la session suivie. */
   usage: TokenUsage;
   activeTasks: number;
+  /** Commandes en arrière-plan lancées par l'agent et pas encore terminées. */
+  background: BackgroundTask[];
 }
 
 /** Poste de travail en coordonnées monde (tuiles). */

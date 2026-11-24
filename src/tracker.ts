@@ -47,6 +47,10 @@ interface CountedMessage {
 const AGENT_TOOLS = new Set(['Agent', 'Task']);
 const DONE_TO_IDLE_MS = 6_000;
 const STALE_MS = 15 * 60_000;
+/** Commande en arrière-plan sans notification de fin : abandonnée après 3 h sans activité dans la session. */
+const BACKGROUND_STALE_MS = 3 * 3_600_000;
+/** Outils qui arrêtent une tâche en arrière-plan (identifiant dans task_id ou shell_id). */
+const STOP_TOOLS = new Set(['TaskStop', 'KillShell', 'KillBash']);
 const DORMANT_AFTER_REPLAY_MS = 90_000;
 const HISTORY_SIZE = 40;
 const FILES_SIZE = 12;
@@ -94,6 +98,9 @@ export class SessionTracker {
     if (record.type === 'ai-title' && typeof record.aiTitle === 'string') {
       this.title = record.aiTitle;
       this.events.onChange();
+    } else if (record.type === 'queue-operation' && typeof record.content === 'string' && record.content.includes('<task-notification>')) {
+      // Notification mise en file : parfois la seule trace d'une commande tuée en fin de session.
+      if (this.endNotified(record.content)) this.events.onChange();
     } else if (record.type === 'cost-state') {
       this.sessionCost = sessionCostOf(record);
       this.events.onChange();
@@ -122,8 +129,12 @@ export class SessionTracker {
     this.markActivity(record);
     if (record.type === 'assistant') {
       if (this.handleAssistant(task.agentId, record, at, task.requestId)) this.finishTask(toolUseId!, at);
-    } else if (record.type === 'user' && hasToolResult(record.message?.content)) {
-      this.setStatus(task.agentId, at, 'thinking');
+    } else if (record.type === 'user') {
+      const content = record.message?.content;
+      if (Array.isArray(content)) for (const block of content) if (block?.type === 'tool_result') this.noteBackgroundResult(block, record.toolUseResult);
+      const text = textOf(content);
+      if (text.startsWith('<task-notification>')) this.endNotified(text);
+      if (hasToolResult(content)) this.setStatus(task.agentId, at, 'thinking');
     }
   }
 
@@ -137,6 +148,10 @@ export class SessionTracker {
         (runtime.status !== 'idle' && runtime.status !== 'asking' && age > STALE_MS);
       if (expired) {
         runtime.status = 'idle';
+        changed = true;
+      }
+      if (runtime.background.length && this.lastActivityAt !== undefined && now - this.lastActivityAt > BACKGROUND_STALE_MS) {
+        runtime.background = [];
         changed = true;
       }
     }
@@ -157,7 +172,7 @@ export class SessionTracker {
   runtimeOf(id: string): AgentRuntime {
     let runtime = this.runtimes.get(id);
     if (!runtime) {
-      runtime = { status: 'idle', statusAt: 0, files: [], history: [], usage: emptyUsage(), activeTasks: 0 };
+      runtime = { status: 'idle', statusAt: 0, files: [], history: [], usage: emptyUsage(), activeTasks: 0, background: [] };
       this.runtimes.set(id, runtime);
     }
     return runtime;
@@ -172,7 +187,11 @@ export class SessionTracker {
   private handleMainUser(record: TranscriptRecord, at: number): void {
     const content = record.message?.content;
     if (Array.isArray(content)) {
-      for (const block of content) if (block?.type === 'tool_result') this.handleToolResult(block.tool_use_id, record.toolUseResult, at);
+      for (const block of content) {
+        if (block?.type !== 'tool_result') continue;
+        this.noteBackgroundResult(block, record.toolUseResult);
+        this.handleToolResult(block.tool_use_id, record.toolUseResult, at);
+      }
     }
     const text = textOf(content);
     if (!text) return;
@@ -180,6 +199,7 @@ export class SessionTracker {
     const origin = record.origin?.kind;
     if (origin === 'task-notification' || text.startsWith('<task-notification>')) {
       const toolUseId = /<tool-use-id>([^<]+)<\/tool-use-id>/.exec(text)?.[1];
+      this.endNotified(text);
       if (toolUseId) this.finishTask(toolUseId, at);
       return;
     }
@@ -266,11 +286,53 @@ export class SessionTracker {
       }
     }
 
+    if (input.run_in_background === true) {
+      const label = typeof input.description === 'string' && input.description ? input.description : clip(String(input.command ?? name), 80);
+      runtime.background = [...runtime.background.filter((b) => b.toolUseId !== block.id), { toolUseId: block.id, label, since: at }];
+    }
+    if (STOP_TOOLS.has(name)) this.endBackground([], [String(input.task_id ?? input.shell_id ?? input.bash_id ?? '')]);
+
     const action = describeTool(name, input);
     if (action.file) {
       runtime.files = [action.file, ...runtime.files.filter((f) => f !== action.file)].slice(0, FILES_SIZE);
     }
     this.apply(agentId, at, action.status, action.text, action.status === 'asking' ? 'ask' : 'action');
+  }
+
+  // ---- Commandes en arrière-plan ------------------------------------------------------
+
+  /** Réponse au lancement : identifiant de tâche, ou échec (la commande n'a pas démarré). */
+  private noteBackgroundResult(block: TranscriptRecord, result: TranscriptRecord): void {
+    for (const runtime of this.runtimes.values()) {
+      const task = runtime.background.find((b) => b.toolUseId === block.tool_use_id);
+      if (!task) continue;
+      if (block.is_error) {
+        runtime.background = runtime.background.filter((b) => b !== task);
+        return;
+      }
+      const fromResult = result && typeof result === 'object' ? result.backgroundTaskId : undefined;
+      task.taskId = typeof fromResult === 'string' ? fromResult : /with ID: ([\w-]+)/.exec(textOf(block.content))?.[1];
+      return;
+    }
+  }
+
+  /** Notification de tâche : termine chaque commande citée (une notification peut en citer plusieurs). */
+  private endNotified(text: string): boolean {
+    const toolUseIds = [...text.matchAll(/<tool-use-id>([^<]+)<\/tool-use-id>/g)].map((m) => m[1]);
+    const taskIds = [...text.matchAll(/<task-id>([^<]+)<\/task-id>/g)].map((m) => m[1]);
+    return this.endBackground(toolUseIds, taskIds);
+  }
+
+  private endBackground(toolUseIds: string[], taskIds: string[]): boolean {
+    let changed = false;
+    for (const runtime of this.runtimes.values()) {
+      const kept = runtime.background.filter((b) => !toolUseIds.includes(b.toolUseId) && !(b.taskId && taskIds.includes(b.taskId)));
+      if (kept.length !== runtime.background.length) {
+        runtime.background = kept;
+        changed = true;
+      }
+    }
+    return changed;
   }
 
   // ---- Tâches déléguées ------------------------------------------------------------

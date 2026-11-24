@@ -247,5 +247,5 @@ export class CrewHub {
 }
 
 function emptyRuntime(): AgentRuntime {
-  return { status: 'idle', statusAt: 0, files: [], history: [], usage: emptyUsage(), activeTasks: 0 };
+  return { status: 'idle', statusAt: 0, files: [], history: [], usage: emptyUsage(), activeTasks: 0, background: [] };
 }
