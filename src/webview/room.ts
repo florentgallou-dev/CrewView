@@ -9,7 +9,6 @@ import { STATUS_COLORS } from './status';
 
 export const WALL_HEIGHT = 3;
 const DESK_HEIGHT = 0.75;
-const INK = '#16181b';
 
 /** Porte de l'espace intérim, sur le mur gauche, à hauteur de la dernière rangée. */
 export function doorOf(room: RoomLayout): { y: number; width: number } {
@@ -315,24 +314,3 @@ const ACCESSORY_SPRITES: Record<Exclude<Accessory, 'none' | 'server'>, string> =
 };
 
 /** Étiquette au sol, devant l'agent. */
-export function drawNameplate(ctx: CanvasRenderingContext2D, agent: SceneAgent, selected: boolean): void {
-  const { x, y, w, d } = agent.desk;
-  const p = iso(x + w / 2, y + d + 1.05);
-  const label = agent.temp ? `${agent.name} · intérim` : agent.name;
-  ctx.font = `${selected ? 700 : 600} 10.5px "Segoe UI", system-ui, sans-serif`;
-  const width = ctx.measureText(label).width + 20;
-  ctx.fillStyle = selected ? '#ffffff' : 'rgba(255,255,255,0.86)';
-  ctx.strokeStyle = selected ? agent.color : 'rgba(22,24,27,0.18)';
-  ctx.lineWidth = selected ? 1.6 : 1;
-  ctx.beginPath();
-  ctx.roundRect(p.x - width / 2, p.y - 8, width, 16, 8);
-  ctx.fill();
-  ctx.stroke();
-  ctx.fillStyle = agent.color;
-  ellipse(ctx, p.x - width / 2 + 8, p.y, 3, 3);
-  ctx.fill();
-  ctx.fillStyle = INK;
-  ctx.textBaseline = 'middle';
-  ctx.fillText(label, p.x - width / 2 + 14, p.y + 0.5);
-  ctx.textBaseline = 'alphabetic';
-}

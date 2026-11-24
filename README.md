@@ -135,7 +135,7 @@ Les conventions (échelle, point d'ancrage, perspective isométrique, `currentCo
 
 | Statut | Déclencheur dans le transcript | Animation |
 |---|---|---|
-| Réfléchit | bloc de réflexion, demande reçue, tâche reçue | main au menton, bulle violette (texte de la réflexion quand Claude l'expose, sinon •••) |
+| Réfléchit | bloc de réflexion, demande reçue, tâche reçue | main au menton, engrenage orange ; bulle violette seulement quand Claude expose le texte de sa réflexion |
 | Lit | Read, Grep, Glob, WebFetch, WebSearch | penché vers l'écran |
 | Écrit | Edit, Write, NotebookEdit | tape au clavier |
 | Exécute | Bash, outils MCP | tape, écran qui pulse, baie serveur qui clignote |
@@ -161,6 +161,8 @@ Pendant le travail (réflexion, lecture, écriture, exécution), l'agent est **d
 Il tourne tant qu'il n'est pas vert et reste fixe en vert. Une légende en haut à droite de la vue rappelle les couleurs et met en gras l'état en cours (pastilles seules sur une vue étroite, libellé au survol). Quand plusieurs agents travaillent, la couleur suit l'ordre du tableau : une question passe avant tout, puis l'activité la plus lourde. Un agent qui délègue passe après la lecture, pour laisser voir ce que font ses sous-agents. Une demande de permission (« Autoriser cette commande ? ») n'est pas écrite dans le transcript et n'allume donc pas le bleu.
 
 **Arrière-plan.** Une commande lancée en arrière-plan (`run_in_background`), par l'agent principal ou par un sous-agent, est en cours jusqu'à sa notification de fin, ou jusqu'à son arrêt par TaskStop / KillShell. Sans notification (Claude Code fermé pendant qu'elle tournait), elle est considérée comme terminée après 3 h sans activité dans la session. L'infobulle de la barre d'état liste les commandes en cours.
+
+**Lisibilité.** Les noms et les bulles de tous les agents sont placés ensemble à chaque image, de l'avant vers le fond : aucun ne masque une autre étiquette, la silhouette ou l'engrenage d'un agent. Une étiquette qui chevaucherait est décalée le moins possible (un nom en haut ou en bas, une bulle vers le haut ou sur le côté), en douceur. Au-delà de quelques pixels, un fin trait la relie à son agent.
 
 **Engrenage.** Un engrenage tourne en haut à droite de la tête de chaque agent occupé, de la couleur du gyrophare pour son activité (violet s'il n'a qu'une commande en arrière-plan). Un agent libre n'en a pas.
 

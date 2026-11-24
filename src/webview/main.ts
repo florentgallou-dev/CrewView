@@ -8,7 +8,8 @@ import { el, fill } from './dom';
 import { drawFigure, FIGURE_HEIGHT, poseFor } from './figure';
 import { iso, type Point } from './iso';
 import { agentLevel, beaconLevel, createLegend, drawGear } from './beacon';
-import { decorDrawables, deskDepth, doorOf, drawDesk, drawDeskFloor, drawNameplate, drawRoom, type Drawable, WALL_HEIGHT } from './room';
+import { layoutLabels, type LabelRequest, type Obstacle, type Offset, type Rect } from './labels';
+import { decorDrawables, deskDepth, doorOf, drawDesk, drawDeskFloor, drawRoom, type Drawable, WALL_HEIGHT } from './room';
 import { setTheme } from './sprites';
 import { BUBBLE_TTL_MS, STATUS_COLORS, STATUS_LABELS } from './status';
 import { addStop, type FloorPlan, isHeadingTo, startArrival, startDelivery, stepWalker, visitorSpot, type Vec2, type Walker } from './walk';
@@ -46,6 +47,11 @@ let selectedId: string | undefined;
 let connected = false;
 const walkers = new Map<string, Walker>();
 const bubbles = new Map<string, HTMLDivElement>();
+const nameplates = new Map<string, HTMLDivElement>();
+/** Taille mesurée de chaque étiquette, remesurée seulement quand son contenu change. */
+const labelSizes = new WeakMap<HTMLElement, { key: string; width: number; height: number }>();
+/** Décalage affiché de chaque étiquette, qui rejoint en douceur le décalage calculé. */
+const labelOffsets = new Map<string, Offset>();
 const seenAgents = new Set<string>();
 const seeds = new Map<string, number>();
 const statusSince = new Map<string, { status: AgentStatus; at: number }>();
@@ -195,9 +201,10 @@ function frame(now: number): void {
     drawables.push({ depth: position[0] + position[1], draw: (c, time) => drawAgent(c, agent, position, time) });
   }
   drawables.sort((a, b) => a.depth - b.depth).forEach((d) => d.draw(ctx, t));
-  for (const agent of agents) drawNameplate(ctx, agent, agent.id === selectedId);
 
-  updateBubbles(agents);
+  const leaders = updateLabels(agents, dt);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  drawLeaders(ctx, leaders);
   requestAnimationFrame(frame);
 }
 
@@ -284,69 +291,166 @@ function toScreen(p: Point): Point {
   return { x: p.x * camera.scale + camera.ox, y: p.y * camera.scale + camera.oy };
 }
 
-// ---- Bulles ---------------------------------------------------------------------------------
+// ---- Noms et bulles ---------------------------------------------------------------------------
 
-function updateBubbles(agents: SceneAgent[]): void {
+interface Leader {
+  from: Point;
+  to: Point;
+}
+
+/** Engrenage, en haut à droite de la tête (repère monde, par rapport aux pieds). */
+const GEAR_DX = 11;
+const GEAR_R = 8;
+/** Au-delà de ce décalage, un trait relie l'étiquette à son agent (un nom proche de son bureau reste lisible sans). */
+const LEADER_MIN_PX = { name: 22, bubble: 10 };
+
+/**
+ * Noms et bulles de tous les agents, placés ensemble de l'avant vers le fond : aucun ne masque une autre
+ * étiquette, la silhouette ou l'engrenage d'un autre agent. Renvoie les traits de rappel des étiquettes déplacées.
+ */
+function updateLabels(agents: SceneAgent[], dt: number): Leader[] {
   const now = Date.now();
-  const placed: { left: number; right: number; top: number; bottom: number }[] = [];
+  const s = camera.scale;
+  const requests: LabelRequest[] = [];
+  const obstacles: Obstacle[] = [];
+  const anchors = new Map<string, Point>();
+  const elements = new Map<string, HTMLDivElement>();
   const alive = new Set<string>();
-  // De l'avant vers le fond : les bulles des agents les plus proches gardent leur place.
-  const ordered = [...agents].sort((a, b) => positionOf(b)[0] + positionOf(b)[1] - (positionOf(a)[0] + positionOf(a)[1]));
-  for (const agent of ordered) {
+
+  for (const agent of agents) {
+    const position = positionOf(agent);
+    const foot = toScreen(iso(position[0], position[1]));
+    const headTop = { x: foot.x, y: foot.y - FIGURE_HEIGHT * s };
+    obstacles.push({ owner: agent.id, rect: { left: foot.x - 11 * s, right: foot.x + 11 * s, top: headTop.y - 2 * s, bottom: foot.y + 2 * s } });
+    if (agentLevel(agent.runtime)) {
+      const gear = { x: foot.x + GEAR_DX * s, y: headTop.y + s };
+      // L'engrenage est une information : même les étiquettes de son agent l'évitent.
+      obstacles.push({ owner: `engrenage:${agent.id}`, rect: { left: gear.x - GEAR_R * s, right: gear.x + GEAR_R * s, top: gear.y - GEAR_R * s, bottom: gear.y + GEAR_R * s } });
+    }
+
+    // Nom, au sol devant le bureau.
+    const { x, y, w, d } = agent.desk;
+    const nameId = `name:${agent.id}`;
+    const name = nameplateOf(agent);
+    const nameSize = sizeOf(name, `${name.className}|${name.textContent}`);
+    const nameCenter = toScreen(iso(x + w / 2, y + d + 1.05));
+    requests.push({ id: nameId, owner: agent.id, kind: 'name', depth: x + w / 2 + y + d + 1.05, x: nameCenter.x - nameSize.width / 2, y: nameCenter.y - nameSize.height / 2, ...nameSize });
+    anchors.set(nameId, nameCenter);
+    elements.set(nameId, name);
+    alive.add(nameId);
+
+    // Bulle, au-dessus de la tête.
     const content = bubbleContent(agent, now);
     if (!content) continue;
-    alive.add(agent.id);
-    let el = bubbles.get(agent.id);
-    if (!el) {
-      el = document.createElement('div');
-      el.innerHTML = '<div class="bubble-text"></div>';
-      overlay.appendChild(el);
-      bubbles.set(agent.id, el);
-    }
-    el.className = `bubble ${content.kind}`;
-    el.style.setProperty('--status', STATUS_COLORS[agent.runtime.status]);
-    const textEl = el.firstElementChild as HTMLDivElement;
-    if (textEl.dataset.text !== content.text) {
-      textEl.dataset.text = content.text;
-      textEl.textContent = content.text;
-    }
+    const bubbleId = `bubble:${agent.id}`;
+    const bubble = bubbleOf(agent, content);
+    const size = sizeOf(bubble, `${bubble.className}|${content.text}`);
+    requests.push({ id: bubbleId, owner: agent.id, kind: 'bubble', depth: position[0] + position[1], x: headTop.x - size.width / 2, y: headTop.y - 8 - size.height, ...size });
+    anchors.set(bubbleId, headTop);
+    elements.set(bubbleId, bubble);
+    alive.add(bubbleId);
+  }
 
-    const position = positionOf(agent);
-    const head = toScreen(iso(position[0], position[1]));
-    const width = el.offsetWidth;
-    const height = el.offsetHeight;
-    const rect = { left: head.x - width / 2, right: head.x + width / 2, bottom: head.y - FIGURE_HEIGHT * camera.scale - 8, top: 0 };
-    rect.top = rect.bottom - height;
-    // Remonte la bulle tant qu'elle chevauche une bulle déjà posée.
-    for (let moved = true; moved; ) {
-      moved = false;
-      for (const other of placed) {
-        if (rect.left < other.right && rect.right > other.left && rect.top < other.bottom && rect.bottom > other.top) {
-          rect.bottom = other.top - 4;
-          rect.top = rect.bottom - height;
-          moved = true;
-        }
-      }
+  const targets = layoutLabels(requests, obstacles);
+  const ease = 1 - Math.exp(-dt / 0.035);
+  const leaders: Leader[] = [];
+  for (const request of requests) {
+    const target = targets.get(request.id) ?? { dx: 0, dy: 0 };
+    const current = labelOffsets.get(request.id) ?? target;
+    const offset = { dx: current.dx + (target.dx - current.dx) * ease, dy: current.dy + (target.dy - current.dy) * ease };
+    labelOffsets.set(request.id, offset);
+    const element = elements.get(request.id)!;
+    const rect: Rect = { left: request.x + offset.dx, top: request.y + offset.dy, right: request.x + offset.dx + request.width, bottom: request.y + offset.dy + request.height };
+    element.style.transform = `translate(${Math.round(rect.left)}px, ${Math.round(rect.top)}px)`;
+    element.style.zIndex = String(Math.round(request.depth * 10) * 2 + (request.kind === 'bubble' ? 1 : 0));
+    const moved = Math.hypot(offset.dx, offset.dy) > LEADER_MIN_PX[request.kind];
+    // Bulle déplacée : sa pointe ne désignerait plus le bon agent, un trait de rappel la remplace.
+    if (request.kind === 'bubble') element.classList.toggle('shifted', moved);
+    if (moved) {
+      const to = anchors.get(request.id)!;
+      leaders.push({ from: { x: Math.min(Math.max(to.x, rect.left), rect.right), y: Math.min(Math.max(to.y, rect.top), rect.bottom) }, to });
     }
-    placed.push(rect);
-    // Bulle décalée : la pointe ne désignerait plus le bon agent.
-    el.classList.toggle('shifted', rect.bottom < head.y - FIGURE_HEIGHT * camera.scale - 8);
-    el.style.transform = `translate(${rect.left}px, ${rect.top}px)`;
-    el.style.zIndex = String(Math.round((position[0] + position[1]) * 10));
   }
-  for (const [id, el] of bubbles) {
+
+  for (const [id, element] of [...bubbles].map(([agentId, e]) => [`bubble:${agentId}`, e] as const)) {
     if (alive.has(id)) continue;
-    el.remove();
-    bubbles.delete(id);
+    element.remove();
+    bubbles.delete(id.slice('bubble:'.length));
+    labelOffsets.delete(id);
   }
+  for (const [agentId, element] of nameplates) {
+    if (alive.has(`name:${agentId}`)) continue;
+    element.remove();
+    nameplates.delete(agentId);
+    labelOffsets.delete(`name:${agentId}`);
+  }
+  return leaders;
+}
+
+function drawLeaders(c: CanvasRenderingContext2D, leaders: Leader[]): void {
+  c.strokeStyle = 'rgba(22,24,27,0.38)';
+  c.fillStyle = 'rgba(22,24,27,0.5)';
+  c.lineWidth = 1;
+  for (const { from, to } of leaders) {
+    c.beginPath();
+    c.moveTo(from.x, from.y);
+    c.lineTo(to.x, to.y);
+    c.stroke();
+    c.beginPath();
+    c.arc(to.x, to.y, 2, 0, Math.PI * 2);
+    c.fill();
+  }
+}
+
+function sizeOf(element: HTMLElement, key: string): { width: number; height: number } {
+  const known = labelSizes.get(element);
+  if (known?.key === key) return known;
+  const size = { key, width: element.offsetWidth, height: element.offsetHeight };
+  labelSizes.set(element, size);
+  return size;
+}
+
+function nameplateOf(agent: SceneAgent): HTMLDivElement {
+  let element = nameplates.get(agent.id);
+  if (!element) {
+    element = document.createElement('div');
+    element.innerHTML = '<span class="nameplate-dot"></span><span class="nameplate-text"></span>';
+    overlay.appendChild(element);
+    nameplates.set(agent.id, element);
+  }
+  element.className = `nameplate${agent.id === selectedId ? ' selected' : ''}`;
+  element.style.setProperty('--agent', agent.color);
+  const text = agent.temp ? `${agent.name} · intérim` : agent.name;
+  const textEl = element.lastElementChild as HTMLSpanElement;
+  if (textEl.textContent !== text) textEl.textContent = text;
+  return element;
+}
+
+function bubbleOf(agent: SceneAgent, content: { text: string; kind: string }): HTMLDivElement {
+  let element = bubbles.get(agent.id);
+  if (!element) {
+    element = document.createElement('div');
+    element.innerHTML = '<div class="bubble-text"></div>';
+    overlay.appendChild(element);
+    bubbles.set(agent.id, element);
+  }
+  const shifted = element.classList.contains('shifted');
+  element.className = `bubble ${content.kind}${shifted ? ' shifted' : ''}`;
+  element.style.setProperty('--status', STATUS_COLORS[agent.runtime.status]);
+  const textEl = element.firstElementChild as HTMLDivElement;
+  if (textEl.dataset.text !== content.text) {
+    textEl.dataset.text = content.text;
+    textEl.textContent = content.text;
+  }
+  return element;
 }
 
 function bubbleContent(agent: SceneAgent, now: number): { text: string; kind: string } | undefined {
   const { status, bubble } = agent.runtime;
   const fresh = bubble && now - bubble.at < BUBBLE_TTL_MS;
   if (status === 'thinking') {
-    if (bubble?.kind === 'think' && fresh) return { text: bubble.text, kind: 'think' };
-    return { text: '•••', kind: 'think dots' };
+    // L'engrenage orange montre déjà la réflexion : une bulle seulement quand son texte est exposé.
+    return bubble?.kind === 'think' && fresh ? { text: bubble.text, kind: 'think' } : undefined;
   }
   if (status === 'asking' && bubble) return { text: bubble.text, kind: 'ask' };
   if (!bubble || !fresh || status === 'idle') return undefined;
