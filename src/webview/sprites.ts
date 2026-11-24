@@ -19,6 +19,13 @@ export interface Pivots {
   hanche: [number, number];
   dossier: [number, number];
   longueurs: { bras: number; 'avant-bras': number; jambe: number };
+  /** Engrenages d'un agent occupé : nombre de dents et centre, par rapport au sommet de la tête. */
+  engrenages: { grand: GearPivot; petit: GearPivot };
+}
+
+export interface GearPivot {
+  dents: number;
+  centre: [number, number];
 }
 
 const DEFAULT_PIVOTS: Pivots = {
@@ -27,6 +34,7 @@ const DEFAULT_PIVOTS: Pivots = {
   hanche: [2.6, -2],
   dossier: [11, 10.5],
   longueurs: { bras: 10, 'avant-bras': 10, jambe: 10 },
+  engrenages: { grand: { dents: 14, centre: [13, -2] }, petit: { dents: 9, centre: [21.95, 4.27] } },
 };
 
 let layers: ThemeLayers = [];
@@ -150,10 +158,19 @@ function readPivots(): Pivots {
           'avant-bras': length(lengths['avant-bras'], DEFAULT_PIVOTS.longueurs['avant-bras']),
           jambe: length(lengths.jambe, DEFAULT_PIVOTS.longueurs.jambe),
         },
+        engrenages: {
+          grand: gearPivot(data.engrenages?.grand, DEFAULT_PIVOTS.engrenages.grand, pair),
+          petit: gearPivot(data.engrenages?.petit, DEFAULT_PIVOTS.engrenages.petit, pair),
+        },
       };
     } catch {
       console.warn('Crew View : personnage/pivots.json illisible, couche suivante utilisée');
     }
   }
   return DEFAULT_PIVOTS;
+}
+
+function gearPivot(value: Partial<GearPivot> | undefined, fallback: GearPivot, pair: (v: unknown, f: [number, number]) => [number, number]): GearPivot {
+  const dents = typeof value?.dents === 'number' && value.dents >= 3 ? Math.round(value.dents) : fallback.dents;
+  return { dents, centre: pair(value?.centre, fallback.centre) };
 }

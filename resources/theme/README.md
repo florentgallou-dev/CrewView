@@ -32,7 +32,7 @@ Une dalle de sol mesure 64 × 32 px.
 
 **Écrans** (`ecrans/*.svg`) : l'image est **étirée** sur la dalle de l'écran. Garde le format du `viewBox="0 0 46 32"`.
 
-**`currentColor`** prend la couleur de l'agent : bandeau du bureau, tasse, lampe, bouclier, badge, dossier. Dans `ecrans/`, il prend la couleur du statut (violet pour la réflexion, rouge pour la question…). Dans `decor/gyrophare.svg`, il prend la couleur de l'état de l'équipe (bleu, rouge, orange, jaune, violet ou vert), et dans `personnage/engrenage.svg` celle de l'état de l'agent.
+**`currentColor`** prend la couleur de l'agent : bandeau du bureau, tasse, lampe, bouclier, badge, dossier. Dans `ecrans/`, il prend la couleur du statut (violet pour la réflexion, rouge pour la question…). Dans `decor/gyrophare.svg`, il prend la couleur de l'état de l'équipe (bleu, rouge, orange, jaune, violet ou vert), et dans les deux `personnage/engrenage*.svg` celle de l'état de l'agent.
 
 Les textes sont permis (`<text>`) avec les polices installées sur la machine. Les images ou polices externes ne sont pas chargées.
 
@@ -67,7 +67,8 @@ Les textes sont permis (`<text>`) avec les polices installées sur la machine. L
 | `personnage/jambe.svg` | jambe (hanche → pied), visible en marchant | articulation de départ |
 | `personnage/articulation.svg` | rond posé sur chaque épaule, coude, main, hanche et pied | centre |
 | `personnage/dossier.svg` | dossier porté lors d'une délégation | centre |
-| `personnage/engrenage.svg` | engrenage d'un agent occupé, en haut à droite de sa tête ; l'extension le fait tourner | centre de rotation |
+| `personnage/engrenage.svg` | grand engrenage d'un agent occupé, en haut à droite de sa tête ; une dent pointe vers la droite | centre de rotation |
+| `personnage/engrenage-petit.svg` | petit engrenage, engrené avec le grand ; une dent pointe vers la droite | centre de rotation |
 
 **Écrans par statut :**
 
@@ -99,6 +100,9 @@ Les postures (marche, frappe au clavier, bras levé, main derrière la tête, do
 | `hanche` | hanche droite par rapport au milieu du bas du buste |
 | `dossier` | centre du dossier porté par rapport au milieu des épaules (côté de la marche) |
 | `longueurs` | longueur dessinée de `bras`, `avant-bras` et `jambe` dans leur SVG |
+| `engrenages` | pour `grand` et `petit` : nombre de `dents` et `centre` par rapport au sommet de la tête |
+
+**Engrenages :** l'extension fait tourner les deux roues en sens inverse, à des vitesses inversement proportionnelles à leur nombre de dents, et les cale pour qu'une dent de l'une tombe dans un creux de l'autre. Si tu les redessines, garde une dent pointée vers la droite dans chaque SVG, indique leur nombre de dents dans `pivots.json`, et place les centres à une distance égale à la somme des rayons primitifs (rayon primitif = module × dents / 2 ; par défaut 0,95 × 14 / 2 + 0,95 × 9 / 2 = 10,925).
 
 ## Ce qui reste dessiné par l'extension
 

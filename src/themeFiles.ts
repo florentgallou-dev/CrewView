@@ -43,6 +43,7 @@ export const THEME_FILES = [
   'personnage/articulation.svg',
   'personnage/dossier.svg',
   'personnage/engrenage.svg',
+  'personnage/engrenage-petit.svg',
   'personnage/pivots.json',
 ] as const;
 

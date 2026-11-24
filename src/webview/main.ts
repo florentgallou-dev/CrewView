@@ -7,7 +7,7 @@ import { renderAgentDetail } from './detail';
 import { el, fill } from './dom';
 import { drawFigure, FIGURE_HEIGHT, poseFor } from './figure';
 import { iso, type Point } from './iso';
-import { agentLevel, beaconLevel, createLegend, drawGear } from './beacon';
+import { agentLevel, beaconLevel, createLegend, drawGear, gearBounds } from './beacon';
 import { layoutLabels, type LabelRequest, type Obstacle, type Offset, type Rect } from './labels';
 import { decorDrawables, deskDepth, doorOf, drawDesk, drawDeskFloor, drawRoom, type Drawable, WALL_HEIGHT } from './room';
 import { setTheme } from './sprites';
@@ -234,7 +234,7 @@ function drawAgent(c: CanvasRenderingContext2D, agent: SceneAgent, position: Vec
   drawFigure(c, foot, pose, agent.color, t, ring);
   // Engrenage de la couleur de son état, en haut à droite de la tête (les bulles s'affichent au-dessus).
   const level = agentLevel(agent.runtime);
-  if (level) drawGear(c, foot.x + 11, foot.y - FIGURE_HEIGHT + 1 - pose.bob, level, t);
+  if (level) drawGear(c, { x: foot.x, y: foot.y - FIGURE_HEIGHT - pose.bob }, level, t);
 }
 
 /** Cadrage automatique de toute la salle, puis zoom et déplacement de l'utilisateur. */
@@ -298,9 +298,6 @@ interface Leader {
   to: Point;
 }
 
-/** Engrenage, en haut à droite de la tête (repère monde, par rapport aux pieds). */
-const GEAR_DX = 11;
-const GEAR_R = 8;
 /** Au-delà de ce décalage, un trait relie l'étiquette à son agent (un nom proche de son bureau reste lisible sans). */
 const LEADER_MIN_PX = { name: 22, bubble: 10 };
 
@@ -323,9 +320,9 @@ function updateLabels(agents: SceneAgent[], dt: number): Leader[] {
     const headTop = { x: foot.x, y: foot.y - FIGURE_HEIGHT * s };
     obstacles.push({ owner: agent.id, rect: { left: foot.x - 11 * s, right: foot.x + 11 * s, top: headTop.y - 2 * s, bottom: foot.y + 2 * s } });
     if (agentLevel(agent.runtime)) {
-      const gear = { x: foot.x + GEAR_DX * s, y: headTop.y + s };
-      // L'engrenage est une information : même les étiquettes de son agent l'évitent.
-      obstacles.push({ owner: `engrenage:${agent.id}`, rect: { left: gear.x - GEAR_R * s, right: gear.x + GEAR_R * s, top: gear.y - GEAR_R * s, bottom: gear.y + GEAR_R * s } });
+      // Les engrenages sont une information : même les étiquettes de leur agent les évitent.
+      const box = gearBounds();
+      obstacles.push({ owner: `engrenage:${agent.id}`, rect: { left: headTop.x + box.left * s, right: headTop.x + box.right * s, top: headTop.y + box.top * s, bottom: headTop.y + box.bottom * s } });
     }
 
     // Nom, au sol devant le bureau.

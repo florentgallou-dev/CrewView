@@ -4,7 +4,8 @@
 
 import type { AgentRuntime, AgentStatus } from '../types';
 import { withAlpha } from './iso';
-import { drawSprite } from './sprites';
+import type { Point } from './iso';
+import { drawSprite, pivots, sprite } from './sprites';
 
 export type BeaconLevel = 'question' | 'writing' | 'thinking' | 'reading' | 'background' | 'free';
 
@@ -120,16 +121,51 @@ function beam(ctx: CanvasRenderingContext2D, color: string, angle: number): void
   ctx.fill();
 }
 
-/** Durée d'un tour d'engrenage, en secondes. */
+/** Durée d'un tour du grand engrenage, en secondes. */
 const GEAR_TURN_S = 2.4;
+const GEARS = { grand: 'personnage/engrenage.svg', petit: 'personnage/engrenage-petit.svg' } as const;
 
-/** Engrenage tournant au-dessus d'un agent occupé, centré en (x, y). */
-export function drawGear(ctx: CanvasRenderingContext2D, x: number, y: number, level: BeaconLevel, t: number): void {
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.rotate((t / GEAR_TURN_S) * Math.PI * 2);
-  drawSprite(ctx, 'personnage/engrenage.svg', { x: 0, y: 0 }, BEACON_COLORS[level]);
-  ctx.restore();
+/**
+ * Angles des deux engrenages à l'instant t : sens opposés, vitesses inversement proportionnelles au nombre
+ * de dents, et calage tel qu'une dent du grand tombe dans un creux du petit sur la ligne des centres.
+ * Dans chaque image, une dent pointe vers l'angle 0.
+ */
+export function gearAngles(t: number, big: { dents: number; centre: [number, number] }, small: { dents: number; centre: [number, number] }): { grand: number; petit: number } {
+  const ratio = big.dents / small.dents;
+  const grand = (t / GEAR_TURN_S) * Math.PI * 2;
+  const line = Math.atan2(small.centre[1] - big.centre[1], small.centre[0] - big.centre[0]);
+  const petit = -ratio * grand + line * (1 + ratio) + Math.PI - Math.PI / small.dents;
+  return { grand, petit };
+}
+
+/** Deux engrenages engrenés au-dessus d'un agent occupé ; headTop est le sommet de sa tête. */
+export function drawGear(ctx: CanvasRenderingContext2D, headTop: Point, level: BeaconLevel, t: number): void {
+  const { grand, petit } = pivots().engrenages;
+  const angles = gearAngles(t, grand, petit);
+  for (const key of ['petit', 'grand'] as const) {
+    const gear = key === 'grand' ? grand : petit;
+    ctx.save();
+    ctx.translate(headTop.x + gear.centre[0], headTop.y + gear.centre[1]);
+    ctx.rotate(angles[key]);
+    drawSprite(ctx, GEARS[key], { x: 0, y: 0 }, BEACON_COLORS[level]);
+    ctx.restore();
+  }
+}
+
+/** Rectangle occupé par les engrenages, par rapport au sommet de la tête (pour le placement des étiquettes). */
+export function gearBounds(): { left: number; top: number; right: number; bottom: number } {
+  const { grand, petit } = pivots().engrenages;
+  const box = { left: Infinity, top: Infinity, right: -Infinity, bottom: -Infinity };
+  for (const key of ['grand', 'petit'] as const) {
+    const gear = key === 'grand' ? grand : petit;
+    const image = sprite(GEARS[key]);
+    const r = image ? Math.max(image.w, image.h) / 2 : key === 'grand' ? 8.5 : 6.3;
+    box.left = Math.min(box.left, gear.centre[0] - r);
+    box.right = Math.max(box.right, gear.centre[0] + r);
+    box.top = Math.min(box.top, gear.centre[1] - r);
+    box.bottom = Math.max(box.bottom, gear.centre[1] + r);
+  }
+  return box;
 }
 
 /** Légende du coin haut droit : une ligne par couleur, l'état en cours mis en évidence. */

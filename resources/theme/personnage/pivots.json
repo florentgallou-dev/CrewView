@@ -1,8 +1,12 @@
 {
-  "_aide": "Pixels de scène (zoom 1), y vers le bas. tete, epaule (côté droit, symétrique à gauche) et dossier : relatifs au milieu des épaules ; hanche : relative au milieu du bas du buste ; longueurs : longueur dessinée de chaque membre dans son SVG. Voir README.md.",
+  "_aide": "Pixels de scène (zoom 1), y vers le bas. tete, epaule (côté droit, symétrique à gauche) et dossier : relatifs au milieu des épaules ; hanche : relative au milieu du bas du buste ; longueurs : longueur dessinée de chaque membre dans son SVG. engrenages : nombre de dents et centre de chaque roue par rapport au sommet de la tête ; la distance entre les centres doit valoir la somme des rayons primitifs (par défaut 6,65 + 4,275 = 10,925). Voir README.md.",
   "tete": [0, -9.4],
   "epaule": [8, 6],
   "hanche": [2.6, -2],
   "dossier": [11, 10.5],
-  "longueurs": { "bras": 10, "avant-bras": 10, "jambe": 10 }
+  "longueurs": { "bras": 10, "avant-bras": 10, "jambe": 10 },
+  "engrenages": {
+    "grand": { "dents": 14, "centre": [13, -2] },
+    "petit": { "dents": 9, "centre": [21.95, 4.27] }
+  }
 }
