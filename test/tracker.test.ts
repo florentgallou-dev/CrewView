@@ -182,3 +182,104 @@ test('commande en arrière-plan : suivie jusqu’à sa notification de fin, ou a
   tracker.sweep(Date.now() + 4 * 3_600_000);
   assert.deepEqual(background(), [], 'abandonnée après 3 h sans activité');
 });
+
+test('tâche asynchrone rendue par SubagentHandback : terminée, un seul rapport, puis au repos', () => {
+  const { tracker, reports, status } = setup();
+  tracker.handleMain(assistant([{ type: 'tool_use', id: 't7', name: 'Agent', input: { subagent_type: 'Explorateur', description: 'Analyser' } }]));
+  tracker.handleMain({ type: 'user', timestamp: at(), message: { content: [{ type: 'tool_result', tool_use_id: 't7' }] }, toolUseResult: { isAsync: true, status: 'async_launched' } });
+  tracker.registerSubagent('a7', { agentType: 'Explorateur', toolUseId: 't7' });
+  tracker.handleSubagent('a7', assistant([{ type: 'tool_use', id: 's7', name: 'Read', input: { file_path: '/p/a.ts' } }]));
+  tracker.handleSubagent('a7', { type: 'user', timestamp: at(), message: { content: [{ type: 'tool_result', tool_use_id: 's7' }] } });
+
+  tracker.handleSubagent('a7', assistant([{ type: 'tool_use', id: 'h7', name: 'SubagentHandback', input: { message: 'Rapport' } }]));
+  assert.equal(status('explorateur'), 'done', 'le rapport rendu clôt la tâche');
+  assert.ok(tracker.runtimeOf('explorateur').history.some((h) => h.text === 'Rend son rapport'));
+  tracker.handleSubagent('a7', { type: 'user', timestamp: at(), message: { content: [{ type: 'tool_result', tool_use_id: 'h7', content: 'Report delivered' }] } });
+  assert.equal(status('explorateur'), 'done', 'l’accusé de réception ne relance pas l’agent');
+
+  const notification = `<task-notification>\n<task-id>a7</task-id>\n<tool-use-id>t7</tool-use-id>\n<status>completed</status>\n</task-notification>`;
+  tracker.handleMain({ type: 'queue-operation', operation: 'enqueue', timestamp: at(), content: notification });
+  tracker.handleMain({ type: 'attachment', timestamp: at(), attachment: { type: 'queued_command', prompt: notification } });
+  assert.deepEqual(reports, [['explorateur', 'orchestrateur']], 'un seul rapport malgré les signaux en double');
+
+  tracker.sweep(Date.now() + 60_000);
+  assert.equal(status('explorateur'), 'idle');
+});
+
+test('tâche asynchrone close par la seule notification en file (queue-operation ou attachment)', () => {
+  for (const kind of ['queue-operation', 'attachment'] as const) {
+    const { tracker, reports, status } = setup();
+    tracker.handleMain(assistant([{ type: 'tool_use', id: 't8', name: 'Agent', input: { subagent_type: 'Explorateur', description: 'Analyser' } }]));
+    tracker.handleMain({ type: 'user', timestamp: at(), message: { content: [{ type: 'tool_result', tool_use_id: 't8' }] }, toolUseResult: { isAsync: true, status: 'async_launched' } });
+    const notification = '<task-notification>\n<task-id>a8</task-id>\n<tool-use-id>t8</tool-use-id>\n</task-notification>';
+    tracker.handleMain(kind === 'queue-operation'
+      ? { type: 'queue-operation', operation: 'enqueue', timestamp: at(), content: notification }
+      : { type: 'attachment', timestamp: at(), attachment: { type: 'queued_command', prompt: notification } });
+    assert.equal(status('explorateur'), 'done', kind);
+    assert.equal(reports.length, 1, kind);
+  }
+});
+
+test('relance par SendMessage après un SubagentHandback : la tâche se rouvre et rend un second rapport', () => {
+  const { tracker, reports, status } = setup();
+  tracker.handleMain(assistant([{ type: 'tool_use', id: 't6', name: 'Agent', input: { subagent_type: 'Explorateur', description: 'Analyser' } }]));
+  tracker.registerSubagent('a6', { agentType: 'Explorateur', toolUseId: 't6' });
+  tracker.handleSubagent('a6', assistant([{ type: 'tool_use', id: 'h6', name: 'SubagentHandback', input: { message: 'Rapport' } }]));
+  assert.equal(status('explorateur'), 'done');
+  tracker.handleMain(assistant([{ type: 'tool_use', id: 'sm6', name: 'SendMessage', input: { to: 'a6', message: 'Précise' } }]));
+  tracker.handleSubagent('a6', assistant([{ type: 'tool_use', id: 'r6', name: 'Read', input: { file_path: '/p/b.ts' } }]));
+  tracker.handleSubagent('a6', { type: 'user', timestamp: at(), message: { content: [{ type: 'tool_result', tool_use_id: 'r6' }] } });
+  assert.equal(status('explorateur'), 'thinking', 'la tâche rouverte suit de nouveau son agent');
+  tracker.handleSubagent('a6', assistant([{ type: 'tool_use', id: 'h6b', name: 'SubagentHandback', input: { message: 'Précision' } }]));
+  assert.equal(status('explorateur'), 'done');
+  assert.equal(reports.length, 2);
+});
+
+test('une notification relue (enqueue, remove, attachment) ne referme pas une tâche relancée entre-temps', () => {
+  const { tracker, reports, status } = setup();
+  tracker.handleMain(assistant([{ type: 'tool_use', id: 't5', name: 'Agent', input: { subagent_type: 'Explorateur', description: 'Analyser' } }]));
+  tracker.registerSubagent('a5', { agentType: 'Explorateur', toolUseId: 't5' });
+  tracker.handleSubagent('a5', assistant([{ type: 'tool_use', id: 'h5', name: 'SubagentHandback', input: { message: 'Rapport' } }]));
+  const first = '<task-notification>\n<task-id>a5</task-id>\n<tool-use-id>t5</tool-use-id>\n<usage>1</usage>\n</task-notification>';
+  tracker.handleMain({ type: 'queue-operation', operation: 'enqueue', timestamp: at(), content: first });
+  tracker.handleMain(assistant([{ type: 'tool_use', id: 'sm5', name: 'SendMessage', input: { to: 'a5', message: 'Précise' } }]));
+  tracker.handleMain({ type: 'attachment', timestamp: at(), attachment: { type: 'queued_command', prompt: first } });
+  tracker.handleMain({ type: 'queue-operation', operation: 'remove', timestamp: at(), content: first });
+  assert.equal(status('explorateur'), 'thinking', 'la même notification ne clôt qu’une fois');
+  assert.equal(reports.length, 1);
+
+  const second = first.replace('<usage>1</usage>', '<usage>2</usage>');
+  tracker.handleMain({ type: 'queue-operation', operation: 'enqueue', timestamp: at(), content: second });
+  assert.equal(status('explorateur'), 'done', 'une nouvelle notification de la même tâche la clôt');
+  assert.equal(reports.length, 2);
+});
+
+test('SubagentHandback lu après la notification : l’agent reste « terminé »', () => {
+  const { tracker, reports, status } = setup();
+  tracker.handleMain(assistant([{ type: 'tool_use', id: 't4', name: 'Agent', input: { subagent_type: 'Explorateur', description: 'Analyser' } }]));
+  tracker.registerSubagent('a4', { agentType: 'Explorateur', toolUseId: 't4' });
+  tracker.handleMain({ type: 'queue-operation', operation: 'enqueue', timestamp: at(), content: '<task-notification>\n<tool-use-id>t4</tool-use-id>\n</task-notification>' });
+  tracker.handleSubagent('a4', assistant([{ type: 'tool_use', id: 'h4', name: 'SubagentHandback', input: { message: 'Rapport' } }]));
+  assert.equal(status('explorateur'), 'done');
+  assert.equal(reports.length, 1);
+});
+
+test('un message en file qui cite une notification sans en être une ne clôt rien', () => {
+  const { tracker, status } = setup();
+  tracker.handleMain(assistant([{ type: 'tool_use', id: 't3b', name: 'Agent', input: { subagent_type: 'Explorateur', description: 'Analyser' } }]));
+  tracker.handleMain({ type: 'queue-operation', operation: 'enqueue', timestamp: at(), content: 'Regarde ça : <task-notification><tool-use-id>t3b</tool-use-id></task-notification>' });
+  assert.equal(status('explorateur'), 'thinking');
+});
+
+test('mémoire des notifications bornée : seules les 100 dernières sont retenues', () => {
+  const { tracker, reports, status } = setup();
+  tracker.handleMain(assistant([{ type: 'tool_use', id: 't0', name: 'Agent', input: { subagent_type: 'Explorateur', description: 'Analyser' } }]));
+  tracker.registerSubagent('a0', { agentType: 'Explorateur', toolUseId: 't0' });
+  const first = '<task-notification>\n<tool-use-id>t0</tool-use-id>\n</task-notification>';
+  tracker.handleMain({ type: 'queue-operation', operation: 'enqueue', timestamp: at(), content: first });
+  for (let i = 0; i < 100; i++) tracker.handleMain({ type: 'queue-operation', operation: 'enqueue', timestamp: at(), content: `<task-notification>\n<task-id>bash${i}</task-id>\n</task-notification>` });
+  tracker.handleMain(assistant([{ type: 'tool_use', id: 'sm0', name: 'SendMessage', input: { to: 'a0', message: 'Précise' } }]));
+  tracker.handleMain({ type: 'queue-operation', operation: 'enqueue', timestamp: at(), content: first });
+  assert.equal(status('explorateur'), 'done', 'la plus ancienne a été oubliée');
+  assert.equal(reports.length, 2);
+});

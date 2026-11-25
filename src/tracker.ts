@@ -55,6 +55,8 @@ const DORMANT_AFTER_REPLAY_MS = 90_000;
 const HISTORY_SIZE = 40;
 const FILES_SIZE = 12;
 const MOVES_SIZE = 40;
+/** Notifications retenues pour ignorer leurs doublons : les plus récentes suffisent. */
+const NOTIFICATIONS_SIZE = 100;
 
 export class SessionTracker {
   readonly runtimes = new Map<string, AgentRuntime>();
@@ -81,6 +83,8 @@ export class SessionTracker {
   private readonly tasks = new Map<string, Task>();
   private readonly subagentFiles = new Map<string, string>();
   private readonly toolNames = new Map<string, string>();
+  /** Notifications déjà traitées : la même est écrite en enqueue, remove et attachment. */
+  private readonly notifications = new Set<string>();
   /** Une réponse du modèle est découpée en plusieurs enregistrements portant le même id : on garde le dernier relevé. */
   private readonly counted = new Map<string, CountedMessage>();
 
@@ -98,9 +102,13 @@ export class SessionTracker {
     if (record.type === 'ai-title' && typeof record.aiTitle === 'string') {
       this.title = record.aiTitle;
       this.events.onChange();
-    } else if (record.type === 'queue-operation' && typeof record.content === 'string' && record.content.includes('<task-notification>')) {
-      // Notification mise en file : parfois la seule trace d'une commande tuée en fin de session.
-      if (this.endNotified(record.content)) this.events.onChange();
+    } else if (record.type === 'queue-operation' && typeof record.content === 'string') {
+      // Notification mise en file : parfois la seule trace de la fin d'une tâche déléguée ou d'une commande tuée.
+      const text = record.content.trim();
+      if (text.startsWith('<task-notification>')) this.notified(text, at);
+    } else if (record.type === 'attachment' && record.attachment?.type === 'queued_command') {
+      const text = textOf(record.attachment.prompt);
+      if (text.startsWith('<task-notification>')) this.notified(text, at);
     } else if (record.type === 'cost-state') {
       this.sessionCost = sessionCostOf(record);
       this.events.onChange();
@@ -128,13 +136,21 @@ export class SessionTracker {
     const at = timeOf(record);
     this.markActivity(record);
     if (record.type === 'assistant') {
-      if (this.handleAssistant(task.agentId, record, at, task.requestId)) this.finishTask(toolUseId!, at);
+      const wasActive = task.active;
+      const ended = this.handleAssistant(task.agentId, record, at, task.requestId);
+      // Rapport rendu par l'outil SubagentHandback : fin de la tâche, sans fin de tour.
+      if (ended || hasToolUse(record.message?.content, 'SubagentHandback')) {
+        // Notification lue avant le rapport : la tâche est déjà close, l'agent redevient « terminé ».
+        if (!wasActive && this.runtimeOf(task.agentId).activeTasks === 0) this.setStatus(task.agentId, at, 'done');
+        else this.finishTask(toolUseId!, at);
+      }
     } else if (record.type === 'user') {
       const content = record.message?.content;
       if (Array.isArray(content)) for (const block of content) if (block?.type === 'tool_result') this.noteBackgroundResult(block, record.toolUseResult);
       const text = textOf(content);
       if (text.startsWith('<task-notification>')) this.endNotified(text);
-      if (hasToolResult(content)) this.setStatus(task.agentId, at, 'thinking');
+      // Une tâche close ne revit pas sur un résultat tardif (accusé de réception du rapport).
+      if (hasToolResult(content) && task.active) this.setStatus(task.agentId, at, 'thinking');
     }
   }
 
@@ -198,9 +214,7 @@ export class SessionTracker {
 
     const origin = record.origin?.kind;
     if (origin === 'task-notification' || text.startsWith('<task-notification>')) {
-      const toolUseId = /<tool-use-id>([^<]+)<\/tool-use-id>/.exec(text)?.[1];
-      this.endNotified(text);
-      if (toolUseId) this.finishTask(toolUseId, at);
+      this.notified(text, at);
       return;
     }
     if (record.isMeta || (origin && origin !== 'human')) return;
@@ -314,6 +328,15 @@ export class SessionTracker {
       task.taskId = typeof fromResult === 'string' ? fromResult : /with ID: ([\w-]+)/.exec(textOf(block.content))?.[1];
       return;
     }
+  }
+
+  /** Notification de tâche : clôt les tâches déléguées et les commandes citées. */
+  private notified(text: string, at: number): void {
+    if (this.notifications.has(text)) return;
+    this.notifications.add(text);
+    if (this.notifications.size > NOTIFICATIONS_SIZE) this.notifications.delete(this.notifications.values().next().value!);
+    if (this.endNotified(text)) this.events.onChange();
+    for (const m of text.matchAll(/<tool-use-id>([^<]+)<\/tool-use-id>/g)) this.finishTask(m[1], at);
   }
 
   /** Notification de tâche : termine chaque commande citée (une notification peut en citer plusieurs). */
@@ -502,6 +525,8 @@ export function describeTool(name: string, input: Record<string, any>): ToolActi
       return { status: 'asking', text: input.questions?.[0]?.question ?? 'Vous pose une question' };
     case 'ExitPlanMode':
       return { status: 'asking', text: 'Vous soumet un plan' };
+    case 'SubagentHandback':
+      return { status: 'talking', text: 'Rend son rapport' };
     case 'Skill':
       return { status: 'thinking', text: `Consulte la compétence ${input.skill ?? ''}`.trim() };
     case 'ToolSearch':
@@ -530,6 +555,10 @@ function textOf(content: unknown): string {
     .map((b) => b.text)
     .join('\n')
     .trim();
+}
+
+function hasToolUse(content: unknown, name: string): boolean {
+  return Array.isArray(content) && content.some((b) => b?.type === 'tool_use' && b.name === name);
 }
 
 function hasToolResult(content: unknown): boolean {
