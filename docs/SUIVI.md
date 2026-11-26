@@ -4,13 +4,14 @@
 
 | Lot | Contenu | État |
 |---|---|---|
-| 1 | Correctif : fin des tâches déléguées avec `SubagentHandback` — les intérimaires restent « au travail » après avoir rendu leur rapport | Validé, commité ; publication 0.8.3 en attente |
+| 1 | Correctif : fin des tâches déléguées avec `SubagentHandback` — les intérimaires restent « au travail » après avoir rendu leur rapport | Validé, commité, publié (0.8.3) |
+| 2 | Agents de la configuration globale (plugins activés, `~/.claude/agents`) : espace « Agents globaux » permanent dans la salle | Validé, commité, tag `v0.9.0` local ; push en attente |
 
 ## Lot 1 — Fin des tâches déléguées
 
 ### Constat (2026-11-25)
 
-Session `6095fc43…` de `~/DEV/digiworks-claude` : `digiworks:testeur` et `digiworks:relecteur` ont fini à 14:25. À 14:31, l'extension VS Code les montre encore avec leurs engrenages. Atelier, qui embarque Crew View, les montre au repos, mais seulement parce qu'il a relu la session après coup (`settle` après relecture). Suivie en direct, la session y resterait aussi figée.
+Session `6095fc43…` de `~/DEV/digiworks-claude` : `digiworks:testeur` et `digiworks:relecteur` ont fini à 14:25. À 14:31, l'extension VS Code les montre encore avec leurs engrenages. Atelier (devenu digiworks-ide), qui embarque Crew View, les montre au repos, mais seulement parce qu'il a relu la session après coup (`settle` après relecture). Suivie en direct, la session y resterait aussi figée.
 
 La fin d'une tâche déléguée n'est plus écrite comme avant :
 
@@ -34,16 +35,38 @@ Conséquence : les engrenages restent jusqu'à la remise au repos automatique (`
 - Rejeu de la session `6095fc43…` : avant, les deux intérimaires restaient « réfléchit » sans rapport ; après, « terminé » et un rapport chacun.
 - Version 0.8.3, `crew-view-0.8.3.vsix` construit en local (ni tag ni push).
 
+## Lot 2 — Agents de la configuration globale
+
+### Constat (2026-11-26)
+
+Seuls les agents du projet avaient un bureau. Ceux du plugin `digiworks` (`digiworks:testeur`…) ou de `~/.claude/agents` n'apparaissaient qu'en travail, comme intérimaires anonymes, sans nom propre ni description.
+
+### Étape réalisée (2026-11-26)
+
+Choix du cadrage : rangée permanente ; sources = plugins activés et agents personnels. Décision : [0001-agents-globaux](decisions/0001-agents-globaux.md).
+
+- `src/globalAgents.ts` (nouveau) : découverte des agents personnels et des agents des plugins (`installed_plugins.json`, `enabledPlugins`, clé `agents` du manifeste, repli sur `plugins/cache`).
+- `src/layout.ts` : rangées des agents globaux après la grille du projet, `room.globalZone` ; table des intérimaires ensuite.
+- `src/hub.ts`, `src/tracker.ts` : découverte relue toutes les 3 s ; `resolve` attribue `digiworks:testeur` ou le nom court `testeur` au bureau global ; `sourceOf` accepte un chemin absolu.
+- `src/settings.ts` et la vue (`detail.ts`, `sidebar.ts`, `main.ts`, `room.ts`) : provenance affichée (étiquette « testeur · digiworks », tag, fiche « Agent global · plugin digiworks »), espace au sol « AGENTS GLOBAUX », pas de choix de poste pour un agent global.
+- `test/globalAgents.test.ts` : 15 tests (découverte, plugin de projet, désactivation, repli WSL/Windows, manifeste, priorité au projet, placement, hub, suivi, nom court ambigu ou intégré, doublons journalisés, JSON malformés, lien symbolique, chemins WSL/Windows, agent global masqué, poste refusé).
+- Relecture (`digiworks:relecteur`) : aucun bloquant ni majeur. Mineurs corrigés : nom court seulement s'il est sans ambiguïté et n'est pas celui d'un agent intégré ; poste refusé côté hôte pour un agent global ; chemins du manifeste confinés au plugin ; liens symboliques suivis (projet compris) ; doublon d'identifiant journalisé ; `projectPath` comparé entre WSL et Windows. Laissés : relecture toutes les 3 s sans cache (négligeable avec un plugin) ; plugin absent de `enabledPlugins` compté comme activé (comportement de Claude Code non vérifié).
+- Vérifié sur la vraie configuration : les 4 agents `digiworks:` ont leur bureau dans crew-view ; le rejeu de la dernière session de `~/DEV/digiworks-claude` attribue le travail du testeur et du relecteur à leurs bureaux globaux.
+- README (section « Agents globaux »), version 0.9.0.
+
 ## Prochaine action
 
-Publier la 0.8.3 : `git push origin main v0.8.3`, refusé depuis la session (pas d'identifiants GitHub en HTTPS). Puis, côté utilisateur : installer `crew-view-0.8.3.vsix` (ou celui de la release GitHub), reconstruire et réinstaller Atelier (`npm run build`, puis `npm run install:windows` dans `~/DEV/atelier`). Aucun lot suivant n'est ouvert.
+Pousser depuis un terminal avec identifiants GitHub : `git push origin main v0.9.0` (refusé depuis la session : pas d'identifiants HTTPS, `gh` absent). Puis, côté utilisateur : installer `crew-view-0.9.0.vsix` (ou celui de la release GitHub), puis reconstruire et réinstaller digiworks-ide, qui embarque Crew View (`npm run install:windows` dans `~/DEV/digiworks-ide`). Aucun lot suivant n'est ouvert.
 
 ## Points en attente
 
-- `docs/decisions/` n'existe pas encore : le créer à la première décision.
+- Rendu de l'espace « Agents globaux » à vérifier dans VS Code (non vu pendant le lot 2).
+- Plugin absent de `enabledPlugins` compté comme activé : comportement de Claude Code à confirmer.
 
 ## Journal
 
 - 2026-11-25 — Suivi créé. Défaut constaté depuis Atelier : intérimaires figés « au travail » après `SubagentHandback`.
 - 2026-11-25 — Lot 1 réalisé : clôture sur `SubagentHandback` et sur les notifications en file ; version 0.8.3.
 - 2026-11-25 — Lot 1 validé : mémoire des notifications bornée à 100, commit et tag `v0.8.3` locaux ; push refusé (pas d'identifiants GitHub).
+- 2026-11-26 — Lot 2 réalisé : agents globaux (plugins, `~/.claude/agents`) dans un espace permanent ; décision 0001 ; version 0.9.0.
+- 2026-11-26 — Lot 2 validé : commit et tag `v0.9.0` locaux ; push refusé (pas d'identifiants GitHub). Atelier est renommé `~/DEV/digiworks-ide` ; `~/DEV/atelier` n'existe plus.

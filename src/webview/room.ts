@@ -41,6 +41,7 @@ export function drawRoom(
   poly(ctx, [[0, 0, 0], [W, 0, 0], [W, D, 0], [0, D, 0]], 'transparent');
   ctx.fillStyle = light;
   ctx.fill();
+  if (room.globalZone) drawGlobalZone(ctx, W, room.globalZone);
 
   // Mur du fond (y = 0) et mur gauche (x = 0) : panneaux dessinés à plat, répétés sur la longueur.
   ctx.save();
@@ -67,6 +68,28 @@ export function drawRoom(
   drawBeacon(ctx, beacon, t);
   ctx.restore();
   drawClock(ctx, W - 2.6, 2.25);
+}
+
+/** Espace des agents globaux : tapis teinté sur toute la largeur, bordé, avec son nom écrit au sol. */
+function drawGlobalZone(ctx: CanvasRenderingContext2D, W: number, zone: NonNullable<RoomLayout['globalZone']>): void {
+  const { y, depth } = zone;
+  const inset = 0.25;
+  poly(ctx, [[inset, y, 0], [W - inset, y, 0], [W - inset, y + depth, 0], [inset, y + depth, 0]], 'rgba(88,153,218,0.08)');
+  ctx.save();
+  ctx.setLineDash([6, 4]);
+  ctx.strokeStyle = 'rgba(88,153,218,0.45)';
+  ctx.lineWidth = 1.25;
+  ctx.stroke();
+  ctx.restore();
+  // Texte couché sur le sol, dans l'axe des x.
+  const origin = iso(inset + 0.25, y + 0.42);
+  ctx.save();
+  ctx.translate(origin.x, origin.y);
+  ctx.transform(0.894, 0.447, -0.894, 0.447, 0, 0);
+  ctx.fillStyle = 'rgba(40,90,140,0.55)';
+  ctx.font = '600 11px "Segoe UI", system-ui, sans-serif';
+  ctx.fillText('AGENTS GLOBAUX', 0, 0);
+  ctx.restore();
 }
 
 const BACK_PANEL = 1.4;

@@ -1,7 +1,7 @@
 // Fiche détaillée d'un agent (panneau du navigateur et vue « Agent sélectionné »).
 // Sections repliables : Rôle, Tâche, Activité, Historique (état mémorisé par l'appelant).
 
-import type { RequestSummary, SceneAgent } from '../types';
+import { originLabel, type RequestSummary, type SceneAgent } from '../types';
 import { type Child, el } from './dom';
 import { STATUS_COLORS, STATUS_LABELS } from './status';
 import { requestTime, usageLines, usageSummary } from './usageView';
@@ -16,7 +16,15 @@ export interface DetailOptions {
 
 export function renderAgentDetail(agent: SceneAgent, options: DetailOptions): Child[] {
   const r = agent.runtime;
-  const kind = agent.isMain ? 'Session principale' : agent.temp ? 'Intérimaire (agent intégré)' : 'Agent du projet';
+  const kind = agent.isMain
+    ? 'Session principale'
+    : agent.temp
+      ? 'Intérimaire (agent intégré)'
+      : agent.global?.scope === 'plugin'
+        ? `Agent global · plugin ${originLabel(agent.global)}`
+        : agent.global
+          ? 'Agent global · personnel (~/.claude/agents)'
+          : 'Agent du projet';
   const fold = (key: string, title: string, byDefault: boolean, ...children: Child[]) => collapsible(key, title, byDefault, options, 'section', ...children);
 
   const perRequest = (options.requests ?? [])
@@ -56,9 +64,15 @@ export function renderAgentDetail(agent: SceneAgent, options: DetailOptions): Ch
     ),
     agent.source &&
       (options.onOpenSource
-        ? el('button', { className: 'link', onclick: options.onOpenSource }, `Ouvrir ${agent.source}`)
-        : el('p', { className: 'muted source' }, agent.source)),
+        ? el('button', { className: 'link', title: agent.source, onclick: options.onOpenSource }, `Ouvrir ${shortSource(agent.source)}`)
+        : el('p', { className: 'muted source', title: agent.source }, shortSource(agent.source))),
   ];
+}
+
+/** Chemin affiché : relatif au projet tel quel ; un chemin absolu (agent global) réduit à ses deux derniers éléments. */
+export function shortSource(source: string): string {
+  if (!/^([a-zA-Z]:)?[\\/]/.test(source)) return source;
+  return `…/${source.split(/[\\/]/).filter(Boolean).slice(-2).join('/')}`;
 }
 
 /** Bloc repliable dont l'état est conservé par l'appelant (les vues sont reconstruites à chaque mise à jour). */

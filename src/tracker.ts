@@ -1,6 +1,7 @@
 // Traduit les enregistrements des transcripts Claude Code en états d'agents.
 // Session principale = agent principal (orchestrateur). Chaque appel de l'outil Agent
-// ouvre une tâche confiée à un agent du projet, ou à un intérimaire si le type n'est pas défini.
+// ouvre une tâche confiée à un agent du projet ou de la configuration globale (personnel, plugin),
+// ou à un intérimaire si le type n'est défini nulle part.
 
 import { normalizeId } from './discovery';
 import type { AgentRuntime, AgentStatus, BubbleKind, ContextUsage, Dialog, Move, RequestSummary, SessionCost, TokenUsage } from './types';
@@ -12,6 +13,8 @@ type TranscriptRecord = any;
 export interface AgentDirectory {
   mainId(): string;
   has(id: string): boolean;
+  /** Agent désigné par un identifiant de type, alias compris (nom court d'un agent de plugin). */
+  resolve?(id: string): string | undefined;
   nameOf(id: string): string | undefined;
   /** Type d'un subagent d'une autre session (relance d'un agent lancé avant une interruption). */
   agentTypeOfFile?(fileAgentId: string): string | undefined;
@@ -390,7 +393,8 @@ export class SessionTracker {
 
   private resolveAgentType(type: string): string {
     const id = normalizeId(type);
-    if (this.directory.has(id)) return id;
+    const known = this.directory.resolve ? this.directory.resolve(id) : this.directory.has(id) ? id : undefined;
+    if (known) return known;
     const tempId = `interim-${id}`;
     if (!this.temps.some((t) => t.id === tempId)) this.temps.push({ id: tempId, name: type });
     return tempId;

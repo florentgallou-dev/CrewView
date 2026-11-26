@@ -5,6 +5,7 @@ import * as path from 'node:path';
 import { claudeHome, projectTranscriptDir } from './claudePaths';
 import { loadConfig, type CrewConfig } from './config';
 import { discoverAgents, type AgentDefinition } from './discovery';
+import { discoverGlobalAgents } from './globalAgents';
 import { applyTempLook, type DeskSlot, type OfficeLayout, placeAgents, placeTemp } from './layout';
 import { SessionWatcher } from './session';
 import { defaultThemeDir, readTheme, themeSignature, themeSources } from './theme';
@@ -33,9 +34,12 @@ const THEME_CHECK_MS = 1_000;
 export class CrewHub {
   readonly root: string;
   readonly transcriptDir: string;
+  /** Dossier de configuration de Claude Code (agents personnels, plugins). */
+  readonly claudeHome: string;
   private layout: OfficeLayout = placeAgents([], {});
   private layoutSignature = '';
   private currentDefinitions: AgentDefinition[] = [];
+  private currentGlobals: AgentDefinition[] = [];
   private currentConfig: CrewConfig = {};
   private currentConfigError?: string;
   private tracker?: SessionTracker;
@@ -50,10 +54,13 @@ export class CrewHub {
   private themeLayers: ThemeLayers = [];
   private currentThemeSignature?: string;
   private readonly log: (line: string) => void;
+  /** Messages déjà journalisés (la découverte est relue toutes les 3 s). */
+  private readonly logged = new Set<string>();
 
   constructor(options: HubOptions) {
     this.root = path.resolve(options.root);
-    this.transcriptDir = projectTranscriptDir(this.root, claudeHome(options.claudeConfigDir));
+    this.claudeHome = claudeHome(options.claudeConfigDir);
+    this.transcriptDir = projectTranscriptDir(this.root, this.claudeHome);
     this.log = options.log ?? (() => undefined);
     this.globalThemeDir = options.themeDir;
     this.baseThemeDir = options.defaultThemeDir ?? defaultThemeDir();
@@ -61,6 +68,7 @@ export class CrewHub {
 
   start(): void {
     this.log(`Projet : ${this.root}`);
+    this.log(`Configuration de Claude Code : ${this.claudeHome}`);
     this.log(`Transcripts surveillés : ${this.transcriptDir}${fs.existsSync(this.transcriptDir) ? '' : ' (pas encore créé)'}`);
     this.reloadDefinitions();
     this.reloadTheme();
@@ -94,15 +102,21 @@ export class CrewHub {
     return () => this.sinks.delete(sink);
   }
 
-  /** Chemin absolu du fichier de définition d'un agent. */
+  /** Chemin absolu du fichier de définition d'un agent (celui d'un agent global l'est déjà). */
   sourceOf(agentId: string): string | undefined {
     const source = this.layout.agents.find((a) => a.id === agentId)?.source;
-    return source ? path.join(this.root, source) : undefined;
+    if (!source) return undefined;
+    return path.isAbsolute(source) ? source : path.join(this.root, source);
   }
 
   /** Configuration et définitions courantes (écran de paramètres). */
   get definitions(): AgentDefinition[] {
     return this.currentDefinitions;
+  }
+
+  /** Agents de la configuration globale de Claude Code (personnels et plugins activés). */
+  get globalDefinitions(): AgentDefinition[] {
+    return this.currentGlobals;
   }
 
   get config(): CrewConfig {
@@ -165,6 +179,7 @@ export class CrewHub {
       {
         mainId: () => this.layout.agents.find((a) => a.isMain)?.id ?? 'main',
         has: (id) => this.layout.agents.some((a) => a.id === id),
+        resolve: (id) => this.resolveAgentId(id),
         nameOf,
         agentTypeOfFile: (fileAgentId) => this.agentTypeOfFile(fileAgentId),
       },
@@ -181,6 +196,15 @@ export class CrewHub {
         },
       },
     );
+  }
+
+  /**
+   * Agent désigné par un type : identifiant exact (projet, personnel, « plugin:nom »),
+   * sinon nom court d'un agent de plugin présent dans la salle.
+   */
+  resolveAgentId(id: string): string | undefined {
+    if (this.layout.agents.some((a) => a.id === id)) return id;
+    return this.currentGlobals.find((g) => g.aliases?.includes(id) && this.layout.agents.some((a) => a.id === g.id))?.id;
   }
 
   /** Type d'un subagent lancé dans une autre session du projet (fichier `<session>/subagents/agent-<id>.meta.json`). */
@@ -206,8 +230,9 @@ export class CrewHub {
   private reloadDefinitions(): void {
     const { config, error } = loadConfig(this.root);
     const definitions = discoverAgents(this.root, config.agentsDirs);
-    const layout = placeAgents(definitions, config);
-    const signature = JSON.stringify([layout, error, config, definitions.map((d) => [d.id, d.name])]);
+    const globals = discoverGlobalAgents(this.claudeHome, this.root, definitions.map((d) => d.id), (line) => this.logOnce(line));
+    const layout = placeAgents(definitions, config, globals);
+    const signature = JSON.stringify([layout, error, config, [...definitions, ...globals].map((d) => [d.id, d.name, d.aliases])]);
     if (signature === this.layoutSignature) return;
     if (this.layoutSignature) this.log(`Agents rechargés : ${layout.agents.map((a) => a.id).join(', ')}`);
     else this.log(`Agents : ${layout.agents.map((a) => (a.isMain ? `${a.id} (principal)` : a.id)).join(', ')}`);
@@ -215,9 +240,16 @@ export class CrewHub {
     this.layoutSignature = signature;
     this.layout = layout;
     this.currentDefinitions = definitions;
+    this.currentGlobals = globals;
     this.currentConfig = config;
     this.currentConfigError = error;
     this.scheduleBroadcast();
+  }
+
+  private logOnce(line: string): void {
+    if (this.logged.has(line)) return;
+    this.logged.add(line);
+    this.log(line);
   }
 
   private reloadTheme(): void {

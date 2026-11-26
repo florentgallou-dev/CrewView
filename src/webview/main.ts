@@ -2,7 +2,7 @@
 // Dans VS Code, la sélection est partagée avec la barre latérale (qui affiche la fiche de l'agent) ;
 // dans le navigateur, la fiche s'affiche dans un panneau flottant.
 
-import type { AgentStatus, ClientMessage, HostMessage, Move, RoomLayout, SceneAgent, SceneState } from '../types';
+import { originLabel, type AgentStatus, type ClientMessage, type HostMessage, type Move, type RoomLayout, type SceneAgent, type SceneState } from '../types';
 import { renderAgentDetail } from './detail';
 import { el, fill } from './dom';
 import { drawFigure, FIGURE_HEIGHT, poseFor } from './figure';
@@ -417,7 +417,8 @@ function nameplateOf(agent: SceneAgent): HTMLDivElement {
   }
   element.className = `nameplate${agent.id === selectedId ? ' selected' : ''}`;
   element.style.setProperty('--agent', agent.color);
-  const text = agent.temp ? `${agent.name} · intérim` : agent.name;
+  const origin = originLabel(agent.global);
+  const text = agent.temp ? `${agent.name} · intérim` : origin ? `${agent.name} · ${origin}` : agent.name;
   const textEl = element.lastElementChild as HTMLSpanElement;
   if (textEl.textContent !== text) textEl.textContent = text;
   return element;

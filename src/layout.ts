@@ -1,11 +1,12 @@
 // Placement des agents dans l'open-space et apparence par défaut.
 // La salle s'agrandit avec le nombre d'agents : grille de bureaux séparés par des couloirs,
-// grand bureau de l'agent principal au fond, table partagée des intérimaires après la dernière rangée.
+// grand bureau de l'agent principal au fond, puis l'espace des agents globaux (configuration de
+// Claude Code commune à tous les projets), enfin la table partagée des intérimaires.
 
 import type { AgentDefinition } from './discovery';
 import { normalizeId } from './discovery';
 import type { AgentLookConfig, CrewConfig } from './config';
-import type { Accessory, Desk, RoomLayout } from './types';
+import type { Accessory, Desk, GlobalOrigin, RoomLayout } from './types';
 
 export const PALETTE = ['#e8743b', '#19a979', '#5899da', '#bf399e', '#d4a20a', '#13a4b4', '#945ecf', '#d64550', '#6c8893', '#7fa035'];
 
@@ -16,6 +17,8 @@ const DESK_D = 0.8;
 const BOSS = { w: 2.4, d: 1.0, y: 0.9 };
 const GRID = { x0: 1.4, y0: 3.8, colStep: 3.2, rowStep: 2.8 };
 const SHARED = { seat: 1.2, seats: 4, d: 0.8 };
+/** L'espace des agents globaux commence un peu avant leurs bureaux. */
+const GLOBAL_ZONE_MARGIN = 0.6;
 /** Marge libre autour de la grille (bords de salle, devant la dernière rangée). */
 const MARGIN = { side: 1.4, front: 1.9 };
 
@@ -45,6 +48,7 @@ export interface PlacedAgent {
   spot: [number, number];
   isMain: boolean;
   temp: boolean;
+  global?: GlobalOrigin;
 }
 
 /** Point où l'agent se tient : devant son bureau, face à son écran. */
@@ -82,12 +86,13 @@ export function gridSlots(count: number): DeskSlot[] {
 }
 
 /**
- * Place l'agent principal au grand bureau, les agents définis sur la grille,
- * et calcule la salle (dimensions, couloirs, table des intérimaires).
+ * Place l'agent principal au grand bureau, les agents du projet sur la grille, les agents globaux
+ * sur les rangées suivantes, et calcule la salle (dimensions, couloirs, espaces, table des intérimaires).
  */
-export function placeAgents(definitions: AgentDefinition[], config: CrewConfig): OfficeLayout {
+export function placeAgents(definitions: AgentDefinition[], config: CrewConfig, globals: AgentDefinition[] = []): OfficeLayout {
   const lookOf = (id: string) => lookFor(config, id);
   const visible = definitions.filter((d) => !lookOf(d.id).hidden);
+  const visibleGlobals = globals.filter((d) => !lookOf(d.id).hidden);
 
   const orchestratorId = config.orchestrator ? normalizeId(config.orchestrator) : visible.find((d) => d.isOrchestrator)?.id;
   const orchestrator = visible.find((d) => d.id === orchestratorId);
@@ -129,10 +134,32 @@ export function placeAgents(definitions: AgentDefinition[], config: CrewConfig):
       temp: false,
     });
   });
+
+  // Espace des agents globaux : rangées de la même grille, après celles du projet.
+  const globalY = GRID.y0 + rows * GRID.rowStep;
+  const globalRows = Math.ceil(visibleGlobals.length / cols);
+  visibleGlobals.forEach((definition, index) => {
+    const look = lookOf(definition.id);
+    const x = GRID.x0 + (index % cols) * GRID.colStep;
+    const y = globalY + Math.floor(index / cols) * GRID.rowStep;
+    agents.push({
+      id: definition.id,
+      name: look.label ?? definition.name,
+      description: definition.description,
+      source: definition.source,
+      color: look.color ?? PALETTE[(specialists.length + index) % PALETTE.length],
+      accessory: look.accessory ?? guessAccessory(`${definition.name} ${definition.description}`),
+      desk: withPosition({ x, y, w: DESK_W, d: DESK_D, kind: 'desk' }, look.desk),
+      spot: [0, 0],
+      isMain: false,
+      temp: false,
+      global: definition.global,
+    });
+  });
   for (const agent of agents) agent.spot = standingSpot(agent.desk);
 
   // Les postes personnalisés (configuration) peuvent sortir de la grille : la salle s'adapte.
-  const sharedY = GRID.y0 + rows * GRID.rowStep;
+  const sharedY = globalY + globalRows * GRID.rowStep;
   const width = Math.max(gridWidth, ...agents.map((a) => a.desk.x + a.desk.w + MARGIN.side));
   const depth = Math.max(sharedY + SHARED.d + MARGIN.front, ...agents.map((a) => a.desk.y + a.desk.d + MARGIN.front));
   const aisles = [GRID.x0 / 2];
@@ -141,7 +168,12 @@ export function placeAgents(definitions: AgentDefinition[], config: CrewConfig):
 
   return {
     agents,
-    room: { width: round(width), depth: round(depth), aisles: aisles.map(round) },
+    room: {
+      width: round(width),
+      depth: round(depth),
+      aisles: aisles.map(round),
+      ...(globalRows > 0 && { globalZone: { y: round(globalY - GLOBAL_ZONE_MARGIN), depth: round(globalRows * GRID.rowStep) } }),
+    },
     slots,
     shared: { x: round(width - 1.0 - SHARED.seats * SHARED.seat), y: round(sharedY) },
   };

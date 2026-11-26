@@ -111,6 +111,19 @@ export interface Desk {
   kind: 'boss' | 'desk' | 'shared';
 }
 
+/** Agent de la configuration globale de Claude Code : personnel (~/.claude/agents) ou fourni par un plugin. */
+export interface GlobalOrigin {
+  scope: 'user' | 'plugin';
+  /** Nom du plugin (scope « plugin »). */
+  plugin?: string;
+}
+
+/** Libellé de provenance d'un agent global : nom du plugin, ou « personnel ». */
+export function originLabel(global: GlobalOrigin | undefined): string | undefined {
+  if (!global) return undefined;
+  return global.scope === 'plugin' ? global.plugin ?? 'plugin' : 'personnel';
+}
+
 export interface SceneAgent {
   id: string;
   name: string;
@@ -123,6 +136,8 @@ export interface SceneAgent {
   spot: [number, number];
   isMain: boolean;
   temp: boolean;
+  /** Agent de la configuration globale (absent pour le projet et les intérimaires). */
+  global?: GlobalOrigin;
   runtime: AgentRuntime;
 }
 
@@ -169,6 +184,8 @@ export interface SceneState {
 export interface RoomLayout {
   width: number;
   depth: number;
+  /** Espace des agents globaux, sur toute la largeur de la salle (en tuiles). */
+  globalZone?: { y: number; depth: number };
   /** Abscisses des couloirs verticaux entre les colonnes de bureaux. */
   aisles: number[];
 }
@@ -186,6 +203,7 @@ export interface SettingsAgent {
   hidden: boolean;
   isMain: boolean;
   temp: boolean;
+  global?: GlobalOrigin;
   /** Index dans `slots`, ou -1 pour une position personnalisée. */
   slot: number;
   desk?: [number, number];

@@ -1,6 +1,6 @@
 // Vues de la barre latérale Crew : liste des agents, agent sélectionné, demandes, paramètres.
 
-import type { Accessory, AgentPatch, ClientMessage, HostMessage, SceneAgent, SceneState, SettingsAgent, SettingsData } from '../types';
+import { originLabel, type Accessory, type AgentPatch, type ClientMessage, type HostMessage, type SceneAgent, type SceneState, type SettingsAgent, type SettingsData } from '../types';
 import { collapsible, type DetailOptions, renderAgentDetail } from './detail';
 import { type Child, el, fill, section } from './dom';
 import { BUBBLE_TTL_MS, STATUS_COLORS, STATUS_LABELS } from './status';
@@ -103,6 +103,7 @@ function agentRow(agent: SceneAgent): HTMLElement {
           el('span', { className: 'name' }, agent.name),
           agent.isMain && el('span', { className: 'tag' }, 'principal'),
           agent.temp && el('span', { className: 'tag' }, 'intérim'),
+          agent.global && el('span', { className: 'tag', title: 'Agent de la configuration globale de Claude Code' }, originLabel(agent.global)),
         ),
         activity && el('span', { className: 'activity' }, activity),
       ),
@@ -253,6 +254,7 @@ function agentEditor(agent: SettingsAgent, d: SettingsData, update: (id: string,
       el('span', { className: `name ${agent.hidden ? 'muted' : ''}` }, agent.name),
       agent.isMain && el('span', { className: 'tag' }, 'principal'),
       agent.temp && el('span', { className: 'tag' }, 'intérim'),
+      agent.global && el('span', { className: 'tag', title: 'Agent de la configuration globale de Claude Code' }, originLabel(agent.global)),
       agent.hidden && el('span', { className: 'tag' }, 'masqué'),
     ),
     el('div', { className: 'editor-body' },
@@ -261,7 +263,7 @@ function agentEditor(agent: SettingsAgent, d: SettingsData, update: (id: string,
       !agent.temp && field('Accessoire',
         selectInput(d.accessories.map((a): [string, string] => [a, ACCESSORY_LABELS[a]]), agent.accessory, (value) => update(agent.id, { accessory: value as Accessory })),
       ),
-      !agent.isMain && !agent.temp && field('Poste', slotInput(agent, d, (slot) => update(agent.id, { slot }))),
+      !agent.isMain && !agent.temp && !agent.global && field('Poste', slotInput(agent, d, (slot) => update(agent.id, { slot }))),
       !agent.isMain && checkbox('Masquer dans l’open-space', agent.hidden, (checked) => update(agent.id, { hidden: checked })),
     ),
   );

@@ -6,6 +6,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { parseFrontmatter, toStringList } from './frontmatter';
+import type { GlobalOrigin } from './types';
 
 export type AgentFormat = 'claude' | 'copilot' | 'generic';
 
@@ -13,13 +14,17 @@ export interface AgentDefinition {
   id: string;
   name: string;
   description: string;
-  /** Chemin relatif à la racine du projet. */
+  /** Chemin relatif à la racine du projet ; absolu pour un agent global. */
   source: string;
   format: AgentFormat;
   tools: string[];
   delegatesTo: string[];
   isOrchestrator: boolean;
   body: string;
+  /** Absent pour un agent du projet. */
+  global?: GlobalOrigin;
+  /** Autres types d'agent qui le désignent (nom court d'un agent de plugin). */
+  aliases?: string[];
 }
 
 export const DEFAULT_AGENT_DIRS = ['.claude/agents', '.github/agents', '.agents'];
@@ -64,7 +69,8 @@ export function readAgentFiles(root: string, dirs: string[]): AgentDefinition[] 
   return agents;
 }
 
-function listAgentFiles(dir: string, depth = 0): string[] {
+/** Fichiers .md d'un dossier d'agents ; `maxDepth` niveaux de sous-dossiers. */
+export function listAgentFiles(dir: string, depth = 0, maxDepth = 1): string[] {
   let entries: fs.Dirent[];
   try {
     entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -74,10 +80,21 @@ function listAgentFiles(dir: string, depth = 0): string[] {
   const files: string[] = [];
   for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
     const full = path.join(dir, entry.name);
-    if (entry.isDirectory() && depth < 1) files.push(...listAgentFiles(full, depth + 1));
-    else if (entry.isFile() && entry.name.endsWith('.md') && !/^readme\.md$/i.test(entry.name)) files.push(full);
+    // Lien symbolique (dotfiles gérés par stow, chezmoi…) : on suit sa cible ; la profondeur bornée évite les boucles.
+    const kind = entry.isSymbolicLink() ? linkKind(full) : entry.isDirectory() ? 'dir' : entry.isFile() ? 'file' : undefined;
+    if (kind === 'dir' && depth < maxDepth) files.push(...listAgentFiles(full, depth + 1, maxDepth));
+    else if (kind === 'file' && entry.name.endsWith('.md') && !/^readme\.md$/i.test(entry.name)) files.push(full);
   }
   return files;
+}
+
+function linkKind(file: string): 'dir' | 'file' | undefined {
+  try {
+    const stat = fs.statSync(file);
+    return stat.isDirectory() ? 'dir' : stat.isFile() ? 'file' : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 /** Chemins d'agents mentionnés dans AGENTS.md : liens markdown ou chemins entre backticks, globs compris. */
@@ -103,7 +120,7 @@ function agentFilesFromAgentsMd(root: string): string[] {
   return [...candidates];
 }
 
-function readAgent(root: string, file: string): AgentDefinition | undefined {
+export function readAgent(root: string, file: string): AgentDefinition | undefined {
   let text: string;
   try {
     text = fs.readFileSync(file, 'utf8');

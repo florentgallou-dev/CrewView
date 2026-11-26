@@ -18,7 +18,7 @@ export function buildSettings(hub: CrewHub, general: { port: number; claudeConfi
   const nameOf = (id: string) => definitions.find((d) => d.id === id)?.name;
   const agents: SettingsAgent[] = [];
 
-  // Ordre : agent principal, agents du projet (y compris masqués), intérimaires.
+  // Ordre : agent principal, agents du projet puis agents globaux (y compris masqués), intérimaires.
   const main = state.agents.find((a) => a.isMain);
   if (main) {
     const look = lookFor(config, main.id);
@@ -41,6 +41,24 @@ export function buildSettings(hub: CrewHub, general: { port: number; claudeConfi
       temp: false,
       slot: desk ? slotIndex(hub.slots, desk[0], desk[1]) : -1,
       desk,
+    });
+  }
+  // Agents globaux : leur place suit leur rangée, elle ne se choisit pas parmi les postes du projet.
+  for (const definition of hub.globalDefinitions) {
+    const look = lookFor(config, definition.id);
+    const placed = state.agents.find((a) => a.id === definition.id);
+    agents.push({
+      id: definition.id,
+      name: placed?.name ?? look.label ?? definition.name,
+      defaultName: definition.name,
+      label: look.label,
+      color: placed?.color ?? look.color ?? '#9aa0a6',
+      accessory: placed?.accessory ?? look.accessory ?? 'none',
+      hidden: Boolean(look.hidden),
+      isMain: false,
+      temp: false,
+      global: definition.global,
+      slot: -1,
     });
   }
   const temps = state.agents.filter((a) => a.temp);
@@ -85,11 +103,13 @@ export function applyAgentPatch(hub: CrewHub, id: string, patch: AgentPatch): vo
       if (patch.hidden) look.hidden = true;
       else delete look.hidden;
     }
-    const slot = patch.slot !== undefined ? hub.slots[patch.slot] : undefined;
+    // Un agent global garde la place de sa rangée : pas de poste de la grille du projet.
+    const isGlobal = hub.globalDefinitions.some((g) => g.id === id);
+    const slot = patch.slot !== undefined && !isGlobal ? hub.slots[patch.slot] : undefined;
     if (slot) {
       // Poste occupé : les deux agents échangent leur place.
       const me = state.agents.find((a) => a.id === id);
-      const occupant = state.agents.find((a) => a.id !== id && !a.isMain && !a.temp && isAt(a.desk, slot.x, slot.y));
+      const occupant = state.agents.find((a) => a.id !== id && !a.isMain && !a.temp && !a.global && isAt(a.desk, slot.x, slot.y));
       if (occupant && me) lookEntry(config, occupant.id).desk = [me.desk.x, me.desk.y];
       look.desk = [slot.x, slot.y];
     }

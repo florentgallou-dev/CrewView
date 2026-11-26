@@ -5,7 +5,8 @@ Open-space isométrique où chaque agent de votre projet a son bureau et s'anime
 - L'agent principal (votre orchestrateur) occupe le grand bureau du fond.
 - Quand il délègue, on le voit se lever et apporter un dossier au bureau de l'agent concerné.
 - Chaque agent réfléchit, lit, écrit ou exécute selon ce qu'il fait réellement. Les bulles affichent sa réflexion ou son action, et le voyant de son écran prend la couleur de son statut.
-- Les agents intégrés à Claude Code (`Explore`, `general-purpose`…), qui ne sont pas définis dans le projet, arrivent par la porte **Intérim** et s'installent à la table partagée.
+- Les agents de votre configuration globale de Claude Code (agents personnels de `~/.claude/agents` et agents des plugins activés, par ex. `digiworks:testeur`) ont leur bureau dans l'espace **Agents globaux**, entre la grille du projet et la table des intérimaires. Ils y restent même quand ils ne travaillent pas.
+- Les agents intégrés à Claude Code (`Explore`, `general-purpose`…), qui ne sont définis nulle part, arrivent par la porte **Intérim** et s'installent à la table partagée.
 - La barre de dialogue en bas reprend votre dernière demande et la réponse de l'orchestrateur.
 - Un clic sur un agent ouvre son panneau : tâche, statut, outils, fichiers touchés, tokens et historique.
 
@@ -83,6 +84,15 @@ Dans cet ordre, en fusionnant les doublons (un même agent au format Copilot et 
 4. `.agents/` ;
 5. les chemins d'agents cités dans `AGENTS.md`, globs compris (par ex. `` `.github/agents/*.agent.md` ``).
 
+### Agents globaux
+
+Crew View lit aussi la configuration globale de Claude Code, dans le dossier du réglage `crewView.claudeConfigDir` (par défaut `CLAUDE_CONFIG_DIR`, sinon `~/.claude`) :
+
+- les **agents personnels** : `agents/` et ses sous-dossiers ;
+- les **agents des plugins** : chaque plugin de `plugins/installed_plugins.json`, installé pour l'utilisateur ou pour ce projet, sauf s'il est désactivé dans `enabledPlugins` (réglages utilisateur, puis `.claude/settings.json` et `.claude/settings.local.json` du projet ; seule cette clé est lue). Ses agents sont dans `agents/`, ou dans les fichiers listés par la clé `agents` de `.claude-plugin/plugin.json`. Ils s'appellent `<plugin>:<nom>`, comme dans Claude Code : leur identifiant Crew View est `digiworks-testeur` pour `digiworks:testeur`.
+
+Comme dans Claude Code, un agent du projet l'emporte sur un agent personnel du même nom. Une délégation au nom court d'un agent de plugin (`testeur`) va à cet agent si aucun agent du projet ou personnel ne porte ce nom, qu'un seul plugin le définit et que ce n'est pas le nom d'un agent intégré (`Explore`, `Plan`…). Deux agents globaux de même identifiant : le premier trouvé est gardé, l'autre est signalé dans le journal. Les liens symboliques sont suivis. Si le chemin d'installation enregistré n'existe pas de ce côté (fichier écrit sous WSL, extension lancée sous Windows), le plugin est recherché dans `plugins/cache/<marketplace>/<plugin>/`. Le projet d'un plugin installé pour un seul projet est reconnu sous ses deux formes (`/mnt/c/…` et `C:\…`). Un plugin absent de `enabledPlugins` compte comme activé.
+
 L'orchestrateur est l'agent qui délègue : clé `agents:` ou outil `agent` dans son frontmatter. On peut aussi le désigner avec `orchestrator` dans la configuration. Sans orchestrateur, le grand bureau revient à « Claude », la session principale.
 
 ## Agents Copilot → subagents Claude Code
@@ -109,9 +119,9 @@ Les fichiers Copilot restent la source : modifiez-les puis régénérez.
 }
 ```
 
-- Les clés de `agents` sont les identifiants (nom normalisé : `Frontend & Builder` → `frontend-builder`) ou les noms tels quels. Les intérimaires ont pour clé `interim-<type>` (par ex. `interim-explore`) ; on peut régler leur `label`, leur `color` et `hidden`.
+- Les clés de `agents` sont les identifiants (nom normalisé : `Frontend & Builder` → `frontend-builder`) ou les noms tels quels. Les intérimaires ont pour clé `interim-<type>` (par ex. `interim-explore`) ; on peut régler leur `label`, leur `color` et `hidden`. Les agents globaux se règlent comme ceux du projet (`digiworks-testeur`, `veilleur`…), mais leur place suit leur rangée et ne se choisit pas parmi les postes ; un agent global masqué qui reçoit une tâche passe à la table des intérimaires.
 - Accessoires : `plant`, `lamp`, `mug`, `books`, `server`, `magnifier`, `trophy`, `shield`, `none`.
-- `desk` est le coin arrière-gauche du bureau, en tuiles. Par défaut, la salle s'agrandit avec le nombre d'agents. La grille compte 4 colonnes jusqu'à 8 agents, 5 jusqu'à 15 et 6 au-delà (x = 1.4 + 3.2 × colonne ; y = 3.8 + 2.8 × rangée), avec des couloirs entre les colonnes. La table des intérimaires est placée après la dernière rangée. Un poste personnalisé hors de la grille agrandit la salle d'autant.
+- `desk` est le coin arrière-gauche du bureau, en tuiles. Par défaut, la salle s'agrandit avec le nombre d'agents. La grille compte 4 colonnes jusqu'à 8 agents, 5 jusqu'à 15 et 6 au-delà (x = 1.4 + 3.2 × colonne ; y = 3.8 + 2.8 × rangée), avec des couloirs entre les colonnes. Les agents globaux occupent les rangées suivantes, dans un espace au sol à part, et la table des intérimaires vient après. Un poste personnalisé hors de la grille agrandit la salle d'autant.
 - Les modifications sont prises en compte à chaud (toutes les 3 s).
 
 ## Graphismes personnalisables
