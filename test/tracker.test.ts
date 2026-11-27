@@ -283,3 +283,25 @@ test('mémoire des notifications bornée : seules les 100 dernières sont retenu
   assert.equal(status('explorateur'), 'done', 'la plus ancienne a été oubliée');
   assert.equal(reports.length, 2);
 });
+
+test('modèle et effort : les derniers lus pour chaque agent, principal comme sous-agent', () => {
+  const { tracker } = setup();
+  const withEngine = (record: ReturnType<typeof assistant>, model: string, effort?: string) => ({ ...record, ...(effort ? { effort } : {}), message: { ...record.message, model } });
+  tracker.handleMain(withEngine(assistant([{ type: 'text', text: 'Je regarde' }]), 'claude-opus-5-5', 'high'));
+  assert.equal(tracker.runtimeOf('orchestrateur').model, 'claude-opus-5-5');
+  assert.equal(tracker.runtimeOf('orchestrateur').effort, 'high');
+
+  tracker.registerSubagent('a9', { agentType: 'explorateur', toolUseId: 't9', description: 'Lire' });
+  tracker.handleSubagent('a9', withEngine(assistant([{ type: 'text', text: 'Lecture' }]), 'claude-sonnet-5-5', 'medium'));
+  assert.equal(tracker.runtimeOf('explorateur').model, 'claude-sonnet-5-5');
+  assert.equal(tracker.runtimeOf('explorateur').effort, 'medium');
+  assert.equal(tracker.runtimeOf('orchestrateur').model, 'claude-opus-5-5', 'chaque agent garde le sien');
+
+  tracker.handleSubagent('a9', withEngine(assistant([{ type: 'text', text: 'Suite' }]), 'claude-haiku-4-5'));
+  assert.equal(tracker.runtimeOf('explorateur').model, 'claude-haiku-4-5');
+  assert.equal(tracker.runtimeOf('explorateur').effort, undefined, 'sans effort écrit, l’ancien ne reste pas');
+
+  tracker.handleMain(withEngine(assistant([{ type: 'text', text: 'API indisponible' }]), '<synthetic>'));
+  assert.equal(tracker.runtimeOf('orchestrateur').model, 'claude-opus-5-5', 'un message synthétique ne change rien');
+  assert.equal(tracker.runtimeOf('orchestrateur').effort, 'high');
+});

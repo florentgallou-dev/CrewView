@@ -247,6 +247,7 @@ export class SessionTracker {
     const message = record.message;
     if (!message) return false;
     this.countUsage(agentId, requestId, message);
+    this.noteEngine(agentId, record);
     const content: TranscriptRecord[] = Array.isArray(message.content) ? message.content : [];
 
     for (const block of content) {
@@ -262,6 +263,15 @@ export class SessionTracker {
       }
     }
     return message.stop_reason === 'end_turn' && !content.some((b) => b?.type === 'tool_use');
+  }
+
+  /** Modèle et effort de la réponse ; un message synthétique (erreur d'API, interruption) ne les change pas. */
+  private noteEngine(agentId: string, record: TranscriptRecord): void {
+    const model = record.message?.model;
+    if (typeof model !== 'string' || !model || model === '<synthetic>') return;
+    const runtime = this.runtimeOf(agentId);
+    runtime.model = model;
+    runtime.effort = typeof record.effort === 'string' && record.effort ? record.effort : undefined;
   }
 
   private handleToolUse(agentId: string, block: TranscriptRecord, at: number): void {

@@ -7,11 +7,11 @@ import { renderAgentDetail } from './detail';
 import { el, fill } from './dom';
 import { drawFigure, FIGURE_HEIGHT, poseFor } from './figure';
 import { iso, type Point } from './iso';
-import { agentLevel, beaconLevel, createLegend, drawGear, gearBounds } from './beacon';
+import { agentLevel, BEACON_COLORS, beaconLevel, createLegend, drawGear, gearBounds } from './beacon';
 import { layoutLabels, type LabelRequest, type Obstacle, type Offset, type Rect } from './labels';
 import { decorDrawables, deskDepth, doorOf, drawDesk, drawDeskFloor, drawRoom, type Drawable, WALL_HEIGHT } from './room';
 import { setTheme } from './sprites';
-import { BUBBLE_TTL_MS, STATUS_COLORS, STATUS_LABELS } from './status';
+import { BUBBLE_TTL_MS, engineLabel, STATUS_COLORS, STATUS_LABELS } from './status';
 import { addStop, type FloorPlan, isHeadingTo, startArrival, startDelivery, stepWalker, visitorSpot, type Vec2, type Walker } from './walk';
 
 declare function acquireVsCodeApi(): { postMessage(message: ClientMessage): void };
@@ -47,6 +47,8 @@ let selectedId: string | undefined;
 let connected = false;
 const walkers = new Map<string, Walker>();
 const bubbles = new Map<string, HTMLDivElement>();
+/** Capsule « modèle · effort » sous les engrenages d'un agent en travail. */
+const engines = new Map<string, HTMLDivElement>();
 const nameplates = new Map<string, HTMLDivElement>();
 /** Taille mesurée de chaque étiquette, remesurée seulement quand son contenu change. */
 const labelSizes = new WeakMap<HTMLElement, { key: string; width: number; height: number }>();
@@ -319,10 +321,23 @@ function updateLabels(agents: SceneAgent[], dt: number): Leader[] {
     const foot = toScreen(iso(position[0], position[1]));
     const headTop = { x: foot.x, y: foot.y - FIGURE_HEIGHT * s };
     obstacles.push({ owner: agent.id, rect: { left: foot.x - 11 * s, right: foot.x + 11 * s, top: headTop.y - 2 * s, bottom: foot.y + 2 * s } });
-    if (agentLevel(agent.runtime)) {
+    const level = agentLevel(agent.runtime);
+    if (level) {
       // Les engrenages sont une information : même les étiquettes de leur agent les évitent.
       const box = gearBounds();
       obstacles.push({ owner: `engrenage:${agent.id}`, rect: { left: headTop.x + box.left * s, right: headTop.x + box.right * s, top: headTop.y + box.top * s, bottom: headTop.y + box.bottom * s } });
+      // Capsule fixe, centrée sous les engrenages ; les noms et les bulles l'évitent comme les engrenages.
+      const text = engineLabel(agent.runtime.model, agent.runtime.effort);
+      if (text) {
+        const engine = engineOf(agent, text, BEACON_COLORS[level]);
+        const size = sizeOf(engine, text);
+        const left = headTop.x + ((box.left + box.right) / 2) * s - size.width / 2;
+        const top = headTop.y + box.bottom * s + 1;
+        engine.style.transform = `translate(${Math.round(left)}px, ${Math.round(top)}px)`;
+        engine.style.zIndex = String(Math.round((position[0] + position[1]) * 10) * 2 + 1);
+        obstacles.push({ owner: `capsule:${agent.id}`, rect: { left, top, right: left + size.width, bottom: top + size.height } });
+        alive.add(`engine:${agent.id}`);
+      }
     }
 
     // Nom, au sol devant le bureau.
@@ -375,6 +390,11 @@ function updateLabels(agents: SceneAgent[], dt: number): Leader[] {
     bubbles.delete(id.slice('bubble:'.length));
     labelOffsets.delete(id);
   }
+  for (const [agentId, element] of engines) {
+    if (alive.has(`engine:${agentId}`)) continue;
+    element.remove();
+    engines.delete(agentId);
+  }
   for (const [agentId, element] of nameplates) {
     if (alive.has(`name:${agentId}`)) continue;
     element.remove();
@@ -405,6 +425,19 @@ function sizeOf(element: HTMLElement, key: string): { width: number; height: num
   const size = { key, width: element.offsetWidth, height: element.offsetHeight };
   labelSizes.set(element, size);
   return size;
+}
+
+function engineOf(agent: SceneAgent, text: string, color: string): HTMLDivElement {
+  let element = engines.get(agent.id);
+  if (!element) {
+    element = document.createElement('div');
+    element.className = 'engine';
+    overlay.appendChild(element);
+    engines.set(agent.id, element);
+  }
+  element.style.setProperty('--level', color);
+  if (element.textContent !== text) element.textContent = text;
+  return element;
 }
 
 function nameplateOf(agent: SceneAgent): HTMLDivElement {

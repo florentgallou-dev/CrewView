@@ -7,6 +7,7 @@
 | 1 | Correctif : fin des tâches déléguées avec `SubagentHandback` — les intérimaires restent « au travail » après avoir rendu leur rapport | Validé, commité, publié (0.8.3) |
 | 2 | Agents de la configuration globale (plugins activés, `~/.claude/agents`) : espace « Agents globaux » permanent dans la salle | Validé, commité, tag `v0.9.0` local ; push en attente |
 | 3 | Session imposée par l'hôte (`follow`) : Digiworks IDE fait suivre la conversation qu'il affiche ; sans hôte, rien ne change | Validé, commité (sans push) |
+| 4 | Capsule « modèle · effort » sous les engrenages d'un agent en travail ; légende du gyrophare remise dans Digiworks IDE | Validé, commité, tag `v0.10.0` local ; push en attente |
 
 ## Lot 1 — Fin des tâches déléguées
 
@@ -72,9 +73,27 @@ Le suivi automatique passe à la session la plus récente quand la session suivi
 - Décision côté hôte : `docs/decisions/0011-crew-suit-la-conversation-ouverte.md` de digiworks-ide. L'extension VS Code n'appelle pas `follow` : comportement inchangé.
 - Pas de nouvelle version ni de `.vsix` : digiworks-ide embarque les sources.
 
+## Lot 4 — Modèle et effort sous les engrenages
+
+### Constat (2026-11-27)
+
+- Claude Code écrit, sur chaque ligne `assistant` du transcript (session principale et sous-agents), `message.model` (`claude-sonnet-5-5`) et un champ `effort` au premier niveau (`medium`). Constaté sur les transcripts du jour ; format non documenté. Crew View ne lisait le modèle que pour le coût.
+- La légende du gyrophare n'avait pas disparu de Crew View (toujours en haut à droite dans VS Code 0.9.0), mais de Digiworks IDE : son `scripts/build.mjs` masque `#corner`, et l'en-tête n'y montre que l'état en cours.
+
+### Étape réalisée (2026-11-27)
+
+Choix du cadrage : format `sonnet-5.5 · medium`, capsule seulement quand les engrenages tournent, légende sous la scène dans Digiworks IDE. Décision : [0002-modele-et-effort-du-transcript](decisions/0002-modele-et-effort-du-transcript.md).
+
+- `src/types.ts`, `src/tracker.ts` : `AgentRuntime.model` et `effort`, ceux de la dernière réponse de l'agent ; un message `<synthetic>` ne les change pas ; sans `effort` écrit, l'ancien ne reste pas.
+- `src/webview/status.ts` : `engineLabel` (préfixe `claude-`, date et suffixe `[1m]` retirés ; ancien format `claude-3-5-sonnet` lu aussi ; format inconnu tel quel).
+- `src/webview/main.ts`, `style.css` : capsule de 9 px bordée de la couleur des engrenages, centrée dessous ; obstacle pour les noms et les bulles.
+- Tests : `test/status.test.ts` (nouveau) et un test dans `test/tracker.test.ts`, montrés rouges puis verts. Suite : 79/79.
+- Côté digiworks-ide : légende sous la scène (ligne « Crew » de son `docs/SUIVI.md`).
+- README (paragraphe « Engrenages »), version 0.10.0, `crew-view-0.10.0.vsix` construit en local (ni tag ni push).
+
 ## Prochaine action
 
-Pousser depuis un terminal avec identifiants GitHub : `git push origin main v0.9.0` (refusé depuis la session : pas d'identifiants HTTPS, `gh` absent). Puis, côté utilisateur : installer `crew-view-0.9.0.vsix` (ou celui de la release GitHub), puis reconstruire et réinstaller digiworks-ide, qui embarque Crew View (`npm run install:windows` dans `~/DEV/digiworks-ide`). Lot 3 validé et commité ; pousser avec le reste (`git push origin main`).
+Pousser depuis un terminal avec identifiants GitHub : `git push origin main v0.9.0 v0.10.0` (pas d'identifiants dans la session). Puis, côté utilisateur : installer `crew-view-0.10.0.vsix`, et reconstruire digiworks-ide (`npm run install:windows` dans `~/DEV/digiworks-ide`) pour la capsule et la légende.
 
 ## Points en attente
 
@@ -90,3 +109,5 @@ Pousser depuis un terminal avec identifiants GitHub : `git push origin main v0.9
 - 2026-11-26 — Lot 2 validé : commit et tag `v0.9.0` locaux ; push refusé (pas d'identifiants GitHub). Atelier est renommé `~/DEV/digiworks-ide` ; `~/DEV/atelier` n'existe plus.
 - 2026-11-26 — Lot 3 réalisé : session imposée par l'hôte (`follow`), pour Digiworks IDE ; 77/77 après relecture.
 - 2026-11-26 — Lot 3 validé avec le lot 12 de digiworks-ide ; commit local.
+- 2026-11-27 — Lot 4 réalisé : capsule « modèle · effort » sous les engrenages ; légende remise dans Digiworks IDE ; version 0.10.0.
+- 2026-11-27 — Lot 4 validé : décision 0002 ; commit et tag `v0.10.0` locaux.

@@ -201,6 +201,27 @@ body {
   background: var(--agent);
 }
 
+/* Capsule « modèle · effort » sous les engrenages d'un agent en travail. */
+.engine {
+  position: absolute;
+  left: 0;
+  top: 0;
+  padding: 0 5px;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid var(--level);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 12px;
+  white-space: nowrap;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+  will-change: transform;
+}
+
 /* ---- Barre de dialogue ------------------------------------------------------- */
 
 #dialog {

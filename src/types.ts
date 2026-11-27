@@ -100,6 +100,10 @@ export interface AgentRuntime {
   activeTasks: number;
   /** Commandes en arrière-plan lancées par l'agent et pas encore terminées. */
   background: BackgroundTask[];
+  /** Modèle de la dernière réponse de l'agent (message.model du transcript). */
+  model?: string;
+  /** Effort de raisonnement de la dernière réponse (champ « effort » du transcript), s'il est écrit. */
+  effort?: string;
 }
 
 /** Poste de travail en coordonnées monde (tuiles). */

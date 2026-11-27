@@ -174,7 +174,7 @@ Il tourne tant qu'il n'est pas vert et reste fixe en vert. Une légende en haut 
 
 **Lisibilité.** Les noms et les bulles de tous les agents sont placés ensemble à chaque image, de l'avant vers le fond : aucun ne masque une autre étiquette, la silhouette ou l'engrenage d'un agent. Une étiquette qui chevaucherait est décalée le moins possible (un nom en haut ou en bas, une bulle vers le haut ou sur le côté), en douceur. Au-delà de quelques pixels, un fin trait la relie à son agent.
 
-**Engrenages.** Deux engrenages engrenés tournent en haut à droite de la tête de chaque agent occupé, de la couleur du gyrophare pour son activité (violet s'il n'a qu'une commande en arrière-plan). Un agent libre n'en a pas.
+**Engrenages.** Deux engrenages engrenés tournent en haut à droite de la tête de chaque agent occupé, de la couleur du gyrophare pour son activité (violet s'il n'a qu'une commande en arrière-plan). Un agent libre n'en a pas. Sous les engrenages, une petite capsule bordée de leur couleur donne le modèle et l'effort de raisonnement de sa dernière réponse, par exemple « sonnet-5.5 · medium » (modèle seul si le transcript n'écrit pas d'effort). Claude Code écrit ces deux valeurs sur chaque réponse du transcript (`message.model`, `effort`) ; ce format n'est pas documenté.
 
 **Déplacements.** Chaque délégation et chaque rapport sont mémorisés pendant 45 s avec un identifiant. Une vue ouverte, rechargée ou reconnectée rejoue ceux qu'elle n'a pas encore montrés. **Passage de relais :** si l'agent principal délègue pendant qu'un agent vient lui rendre son rapport, c'est cet agent qui emporte le dossier jusqu'au suivant. Un agent relancé alors qu'il avait été lancé dans une session précédente est retrouvé par son type.
 
