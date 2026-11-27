@@ -45,6 +45,7 @@ export class CrewHub {
   private tracker?: SessionTracker;
   private sessionId?: string;
   private watcher?: SessionWatcher;
+  private followed?: string;
   private readonly sinks = new Set<Sink>();
   private broadcastTimer?: NodeJS.Timeout;
   private definitionsTimer?: NodeJS.Timeout;
@@ -82,6 +83,7 @@ export class CrewHub {
         this.scheduleBroadcast();
       },
     );
+    if (this.followed) this.watcher.follow(this.followed);
     this.watcher.start();
     this.definitionsTimer = setInterval(() => this.reloadDefinitions(), DEFINITIONS_CHECK_MS);
     this.themeTimer = setInterval(() => this.reloadTheme(), THEME_CHECK_MS);
@@ -93,6 +95,12 @@ export class CrewHub {
     if (this.themeTimer) clearInterval(this.themeTimer);
     if (this.broadcastTimer) clearTimeout(this.broadcastTimer);
     this.sinks.clear();
+  }
+
+  /** Session imposée par l'hôte (celle qu'il affiche), ou undefined pour suivre la plus récente. */
+  follow(sessionId: string | undefined): void {
+    this.followed = sessionId;
+    this.watcher?.follow(sessionId);
   }
 
   subscribe(sink: Sink): () => void {

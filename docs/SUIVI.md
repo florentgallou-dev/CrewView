@@ -6,6 +6,7 @@
 |---|---|---|
 | 1 | Correctif : fin des tâches déléguées avec `SubagentHandback` — les intérimaires restent « au travail » après avoir rendu leur rapport | Validé, commité, publié (0.8.3) |
 | 2 | Agents de la configuration globale (plugins activés, `~/.claude/agents`) : espace « Agents globaux » permanent dans la salle | Validé, commité, tag `v0.9.0` local ; push en attente |
+| 3 | Session imposée par l'hôte (`follow`) : Digiworks IDE fait suivre la conversation qu'il affiche ; sans hôte, rien ne change | Validé, commité (sans push) |
 
 ## Lot 1 — Fin des tâches déléguées
 
@@ -54,9 +55,26 @@ Choix du cadrage : rangée permanente ; sources = plugins activés et agents per
 - Vérifié sur la vraie configuration : les 4 agents `digiworks:` ont leur bureau dans crew-view ; le rejeu de la dernière session de `~/DEV/digiworks-claude` attribue le travail du testeur et du relecteur à leurs bureaux globaux.
 - README (section « Agents globaux »), version 0.9.0.
 
+## Lot 3 — Session imposée par l'hôte
+
+### Constat (2026-11-26)
+
+Le suivi automatique passe à la session la plus récente quand la session suivie est silencieuse depuis 30 s. Une commande longue (10 min) rend la session silencieuse : dans Digiworks IDE, le Crew a basculé sur une autre conversation du projet qui venait de finir et a montré « Disponible » pendant que le travail continuait.
+
+### Étape réalisée (2026-11-26)
+
+- `src/session.ts` : `SessionWatcher.follow(sessionId | undefined)`.
+  - Une session imposée est suivie dès que son fichier existe ; sinon le suivi automatique continue.
+  - L'identifiant est contrôlé (`[\w-]+`).
+  - `undefined` rend la main au suivi automatique : la plus récente est suivie tout de suite, sans attendre 30 s de silence.
+- `src/hub.ts` : `CrewHub.follow`, retenu si appelé avant `start`.
+- `test/session.test.ts` : trois tests, montrés rouges puis verts : deux avant le code (`follow is not a function`), et un après la relecture (session levée alors que l'imposée venait d'écrire). Suite : 77/77.
+- Décision côté hôte : `docs/decisions/0011-crew-suit-la-conversation-ouverte.md` de digiworks-ide. L'extension VS Code n'appelle pas `follow` : comportement inchangé.
+- Pas de nouvelle version ni de `.vsix` : digiworks-ide embarque les sources.
+
 ## Prochaine action
 
-Pousser depuis un terminal avec identifiants GitHub : `git push origin main v0.9.0` (refusé depuis la session : pas d'identifiants HTTPS, `gh` absent). Puis, côté utilisateur : installer `crew-view-0.9.0.vsix` (ou celui de la release GitHub), puis reconstruire et réinstaller digiworks-ide, qui embarque Crew View (`npm run install:windows` dans `~/DEV/digiworks-ide`). Aucun lot suivant n'est ouvert.
+Pousser depuis un terminal avec identifiants GitHub : `git push origin main v0.9.0` (refusé depuis la session : pas d'identifiants HTTPS, `gh` absent). Puis, côté utilisateur : installer `crew-view-0.9.0.vsix` (ou celui de la release GitHub), puis reconstruire et réinstaller digiworks-ide, qui embarque Crew View (`npm run install:windows` dans `~/DEV/digiworks-ide`). Lot 3 validé et commité ; pousser avec le reste (`git push origin main`).
 
 ## Points en attente
 
@@ -70,3 +88,5 @@ Pousser depuis un terminal avec identifiants GitHub : `git push origin main v0.9
 - 2026-11-25 — Lot 1 validé : mémoire des notifications bornée à 100, commit et tag `v0.8.3` locaux ; push refusé (pas d'identifiants GitHub).
 - 2026-11-26 — Lot 2 réalisé : agents globaux (plugins, `~/.claude/agents`) dans un espace permanent ; décision 0001 ; version 0.9.0.
 - 2026-11-26 — Lot 2 validé : commit et tag `v0.9.0` locaux ; push refusé (pas d'identifiants GitHub). Atelier est renommé `~/DEV/digiworks-ide` ; `~/DEV/atelier` n'existe plus.
+- 2026-11-26 — Lot 3 réalisé : session imposée par l'hôte (`follow`), pour Digiworks IDE ; 77/77 après relecture.
+- 2026-11-26 — Lot 3 validé avec le lot 12 de digiworks-ide ; commit local.

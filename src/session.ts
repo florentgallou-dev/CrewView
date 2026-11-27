@@ -25,6 +25,8 @@ export class SessionWatcher {
   private readonly subTails = new Map<string, JsonlTailer>();
   private readonly subMeta = new Map<string, SubagentMeta>();
   private knownFiles?: Set<string>;
+  /** Session imposée par l'hôte (identifiant), suivie quoi qu'il arrive dès que son fichier existe. */
+  private pinned?: string;
 
   constructor(
     private readonly transcriptDir: string,
@@ -41,6 +43,19 @@ export class SessionWatcher {
     if (this.timer) clearInterval(this.timer);
   }
 
+  /** Impose la session suivie (undefined : revenir à la plus récente). Prend effet tout de suite. */
+  follow(sessionId: string | undefined): void {
+    if (sessionId !== undefined && !/^[\w-]+$/.test(sessionId)) return;
+    if (sessionId === this.pinned) {
+      // Fichier peut-être apparu depuis : on vérifie sans attendre le prochain balayage.
+      if (sessionId && path.basename(this.current?.file ?? '', '.jsonl') !== sessionId) this.chooseSession();
+      return;
+    }
+    const released = this.pinned !== undefined && sessionId === undefined;
+    this.pinned = sessionId;
+    this.chooseSession(released);
+  }
+
   private poll(): void {
     if (this.tick++ % SESSION_SCAN_EVERY === 0) this.chooseSession();
     if (!this.tracker || !this.mainTail || !this.current) return;
@@ -51,10 +66,17 @@ export class SessionWatcher {
     this.tracker.sweep(Date.now());
   }
 
-  private chooseSession(): void {
+  /** `now` : l'hôte vient de lever sa session imposée, la plus récente est suivie sans attendre le silence. */
+  private chooseSession(now = false): void {
     const sessions = this.listSessions();
     const isNew = (s: SessionFile) => this.knownFiles !== undefined && !this.knownFiles.has(s.file);
     this.knownFiles = new Set(sessions.map((s) => s.file));
+    const pinned = this.pinned ? sessions.find((s) => path.basename(s.file, '.jsonl') === this.pinned) : undefined;
+    if (pinned) {
+      if (pinned.file === this.current?.file) this.current = pinned;
+      else this.attach(pinned);
+      return;
+    }
     const newest = sessions[0];
     if (!newest || newest.file === this.current?.file) {
       if (newest) this.current = newest;
@@ -62,7 +84,7 @@ export class SessionWatcher {
     }
     const currentMtime = sessions.find((s) => s.file === this.current?.file)?.mtime ?? 0;
     const silent = Date.now() - currentMtime > SWITCH_AFTER_SILENCE_MS;
-    if (!this.current || isNew(newest) || silent) this.attach(newest);
+    if (!this.current || isNew(newest) || silent || now) this.attach(newest);
   }
 
   private listSessions(): SessionFile[] {
